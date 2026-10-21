@@ -1,0 +1,464 @@
+"""FastAPI web dashboard application for TodayTech.
+
+Provides REST APIs and serves the editorial web interface.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Any, Optional
+
+import structlog
+import yaml
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from sqlalchemy import select
+
+from todaytech.core.config import Settings, get_settings, load_profile
+from todaytech.core.database import (
+    ApplicationRow,
+    OpportunityRow,
+    ScanRow,
+    UserStateRow,
+    get_last_scan,
+    get_opportunities,
+    get_opportunity_by_id,
+    get_session,
+    init_db,
+    set_user_state,
+    upsert_opportunity,
+)
+from todaytech.core.pipeline import run_scan
+
+log = structlog.get_logger()
+
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+TEMPLATES_DIR = BASE_DIR / "templates"
+
+
+class StateUpdateRequest(BaseModel):
+    status: str
+    notes: str = ""
+
+
+class ProfileUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    country: Optional[str] = None
+    level: Optional[str] = None
+    university: Optional[str] = None
+    field_of_study: Optional[str] = None
+    skills: Optional[list[str]] = None
+    interests: Optional[list[str]] = None
+    opportunity_types: Optional[list[str]] = None
+
+
+async def _seed_demo_if_empty(session) -> None:
+    """Seed initial opportunities if the database is fresh so the UI looks stunning immediately."""
+    stmt = select(OpportunityRow).limit(1)
+    res = await session.execute(stmt)
+    if res.scalar_one_or_none() is not None:
+        return
+
+    today = date.today()
+    demo_items = [
+        {
+            "external_id": "c8f1e29a1b2c3d4e",
+            "title": "Google Summer of Code 2027 Mentee Program",
+            "type": "fellowship",
+            "organizer": "Google Open Source",
+            "deadline": today + timedelta(days=45),
+            "mode": "online",
+            "location": "Global / Remote",
+            "cost": 0.0,
+            "reward": "$3,000 - $6,000 stipend + 1-on-1 industry mentorship",
+            "eligibility_text": "Open to post-secondary students and beginners to open source worldwide aged 18+.",
+            "countries_allowed": '["all"]',
+            "level_required": "undergraduate",
+            "field_required": "Computer Science / STEM",
+            "fit_score": 96,
+            "fit_reason": "Direct match for Python skills and open source background; high stipend",
+            "eligibility_verdict": "Eligible",
+            "eligibility_reason": "Meets 18+ student requirement; remote participation fully supported",
+            "application_url": "https://summerofcode.withgoogle.com",
+            "source_url": "https://summerofcode.withgoogle.com",
+            "source_name": "Google Open Source",
+        },
+        {
+            "external_id": "7a49d10e9f8e7d6c",
+            "title": "ETHGlobal AI & Web3 Autonomous Hackathon",
+            "type": "hackathon",
+            "organizer": "ETHGlobal",
+            "deadline": today + timedelta(days=4),
+            "mode": "online",
+            "location": "Online / Virtual",
+            "cost": 0.0,
+            "reward": "$50,000 in bounties, grants, and pool prizes",
+            "eligibility_text": "Open to developers, designers, and students worldwide. Teams of 1-5 allowed.",
+            "countries_allowed": '["all"]',
+            "level_required": "all",
+            "field_required": "Software Engineering",
+            "fit_score": 91,
+            "fit_reason": "Excellent hackathon fit; high prize pool; feasible 48-hour build timeline",
+            "eligibility_verdict": "Eligible",
+            "eligibility_reason": "Global online participation with no prerequisite credentials",
+            "application_url": "https://ethglobal.com",
+            "source_url": "https://ethglobal.com",
+            "source_name": "Devpost / ETHGlobal",
+        },
+        {
+            "external_id": "3f8a02bd5e6f7a8b",
+            "title": "Mozilla Technology Fund: Open Source AI Grant",
+            "type": "grant",
+            "organizer": "Mozilla Foundation",
+            "deadline": today + timedelta(days=6),
+            "mode": "online",
+            "location": "Worldwide",
+            "cost": 0.0,
+            "reward": "$25,000 - $50,000 non-dilutive grant funding",
+            "eligibility_text": "Open-source AI tools, transparent models, student researchers, and public good builders.",
+            "countries_allowed": '["all"]',
+            "level_required": "undergraduate",
+            "field_required": "Artificial Intelligence",
+            "fit_score": 86,
+            "fit_reason": "High grant value aligned with open-source ethical AI interests",
+            "eligibility_verdict": "Eligible",
+            "eligibility_reason": "Worldwide applicants eligible with zero application fee",
+            "application_url": "https://foundation.mozilla.org/awards/technology-fund/",
+            "source_url": "https://foundation.mozilla.org",
+            "source_name": "Mozilla Grants",
+        },
+        {
+            "external_id": "119cb4524a3b2c1d",
+            "title": "Mastercard Foundation Scholars Program",
+            "type": "scholarship",
+            "organizer": "Mastercard Foundation",
+            "deadline": today + timedelta(days=60),
+            "mode": "in-person",
+            "location": "Partner Universities (Africa, UK, US, Canada)",
+            "cost": 0.0,
+            "reward": "100% full tuition, living stipend, travel, laptop, and leadership coaching",
+            "eligibility_text": "African youth with academic talent, leadership potential, facing financial barriers.",
+            "countries_allowed": '["Ghana", "Nigeria", "Kenya", "South Africa", "Uganda", "Rwanda"]',
+            "level_required": "undergraduate",
+            "field_required": "Any",
+            "fit_score": 89,
+            "fit_reason": "Fully funded comprehensive package; high benefit for early career development",
+            "eligibility_verdict": "Eligible",
+            "eligibility_reason": "Targeted at youth in your region with strong leadership drive",
+            "application_url": "https://mastercardfdn.org/all/scholars/",
+            "source_url": "https://mastercardfdn.org",
+            "source_name": "Mastercard Foundation",
+        },
+        {
+            "external_id": "55d31ca98b7c6d5e",
+            "title": "Outreachy Remote Software Internship",
+            "type": "internship",
+            "organizer": "Outreachy / Software Freedom Conservancy",
+            "deadline": today + timedelta(days=75),
+            "mode": "online",
+            "location": "Fully Remote",
+            "cost": 0.0,
+            "reward": "$7,000 USD stipend + dedicated 3-month engineering mentor",
+            "eligibility_text": "Open to underrepresented groups in tech globally. Must be able to commit 30 hrs/week.",
+            "countries_allowed": '["all"]',
+            "level_required": "undergraduate",
+            "field_required": "Software Development",
+            "fit_score": 88,
+            "fit_reason": "Paid remote internship with experienced open-source mentor",
+            "eligibility_verdict": "Eligible",
+            "eligibility_reason": "Remote eligible, students and self-taught developers encouraged",
+            "application_url": "https://www.outreachy.org",
+            "source_url": "https://www.outreachy.org",
+            "source_name": "Outreachy",
+        },
+    ]
+
+    for item in demo_items:
+        await upsert_opportunity(session, item)
+    await session.commit()
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI web dashboard application."""
+    app = FastAPI(
+        title="TodayTech Radar",
+        description="Personal Opportunity Radar Web Dashboard",
+        version="0.1.0",
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Static assets
+    STATIC_DIR.mkdir(parents=True, exist_ok=True)
+    TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    @app.on_event("startup")
+    async def on_startup() -> None:
+        settings = get_settings()
+        await init_db(settings.database_url)
+        async with get_session() as session:
+            await _seed_demo_if_empty(session)
+
+    @app.get("/", response_class=HTMLResponse)
+    async def get_index() -> HTMLResponse:
+        index_file = TEMPLATES_DIR / "index.html"
+        if not index_file.exists():
+            return HTMLResponse("<h1>TodayTech is loading... please check back shortly.</h1>")
+        return HTMLResponse(index_file.read_text(encoding="utf-8"))
+
+    @app.get("/api/stats")
+    async def get_stats() -> dict[str, Any]:
+        today = date.today()
+        async with get_session() as session:
+            opps = await get_opportunities(session, limit=200)
+            saved = await session.execute(select(UserStateRow).where(UserStateRow.status == "saved"))
+            saved_count = len(saved.scalars().all())
+
+            drafting = await session.execute(
+                select(UserStateRow).where(UserStateRow.status.in_(["drafting", "in_progress"]))
+            )
+            drafting_count = len(drafting.scalars().all())
+
+            last_scan = await get_last_scan(session)
+
+        closing_soon_count = sum(
+            1 for o in opps if o.deadline and (o.deadline - today) <= timedelta(days=7) and o.deadline >= today
+        )
+
+        return {
+            "total_opportunities": len(opps),
+            "closing_soon_count": closing_soon_count,
+            "saved_count": saved_count,
+            "drafting_count": drafting_count,
+            "last_scan": last_scan.finished_at.isoformat() if last_scan and last_scan.finished_at else None,
+        }
+
+    @app.get("/api/opportunities")
+    async def list_opportunities(
+        type: Optional[str] = Query(None),
+        status: Optional[str] = Query("radar"),  # radar, saved, in_progress, applied, all
+        query: Optional[str] = Query(None),
+        min_score: int = Query(0),
+        closing_soon: bool = Query(False),
+    ) -> list[dict[str, Any]]:
+        today = date.today()
+        async with get_session() as session:
+            opps = await get_opportunities(session, type_filter=type, min_score=min_score, limit=100)
+
+            user_states_stmt = select(UserStateRow)
+            res = await session.execute(user_states_stmt)
+            user_states = {row.opportunity_id: row.status for row in res.scalars().all()}
+
+        results = []
+        for opp in opps:
+            if opp.is_scam:
+                continue
+
+            opp_status = user_states.get(opp.external_id, "radar")
+
+            # Status filter
+            if status == "saved" and opp_status != "saved":
+                continue
+            elif status in ("in_progress", "drafting") and opp_status not in ("drafting", "in_progress"):
+                continue
+            elif status == "applied" and opp_status != "applied":
+                continue
+            elif status == "radar" and opp_status == "ignored":
+                continue
+
+            # Closing soon filter
+            if closing_soon:
+                if not opp.deadline or (opp.deadline - today) > timedelta(days=7) or opp.deadline < today:
+                    continue
+
+            # Query search
+            if query:
+                q = query.lower()
+                combined = f"{opp.title} {opp.organizer} {opp.reward} {opp.eligibility_text}".lower()
+                if q not in combined:
+                    continue
+
+            days_left = (opp.deadline - today).days if opp.deadline else None
+
+            results.append({
+                "id": opp.external_id,
+                "title": opp.title,
+                "type": opp.type,
+                "organizer": opp.organizer or "Independent",
+                "deadline": opp.deadline.isoformat() if opp.deadline else None,
+                "days_left": days_left,
+                "mode": opp.mode or "Online",
+                "location": opp.location or "Global",
+                "cost": opp.cost,
+                "reward": opp.reward,
+                "eligibility_verdict": opp.eligibility_verdict,
+                "eligibility_reason": opp.eligibility_reason,
+                "fit_score": opp.fit_score,
+                "fit_reason": opp.fit_reason,
+                "application_url": opp.application_url or opp.source_url,
+                "source_name": opp.source_name,
+                "status": opp_status,
+            })
+
+        return results
+
+    @app.get("/api/opportunity/{external_id}")
+    async def get_opportunity(external_id: str) -> dict[str, Any]:
+        async with get_session() as session:
+            opp = await get_opportunity_by_id(session, external_id)
+            if not opp:
+                raise HTTPException(status_code=404, detail="Opportunity not found")
+
+            user_state_res = await session.execute(
+                select(UserStateRow).where(UserStateRow.opportunity_id == external_id)
+            )
+            user_state = user_state_res.scalar_one_or_none()
+
+            app_res = await session.execute(
+                select(ApplicationRow).where(ApplicationRow.opportunity_id == external_id)
+            )
+            app_row = app_res.scalar_one_or_none()
+
+        today = date.today()
+        days_left = (opp.deadline - today).days if opp.deadline else None
+
+        return {
+            "id": opp.external_id,
+            "title": opp.title,
+            "type": opp.type,
+            "organizer": opp.organizer,
+            "deadline": opp.deadline.isoformat() if opp.deadline else None,
+            "days_left": days_left,
+            "mode": opp.mode,
+            "location": opp.location,
+            "cost": opp.cost,
+            "reward": opp.reward,
+            "eligibility_text": opp.eligibility_text,
+            "eligibility_verdict": opp.eligibility_verdict,
+            "eligibility_reason": opp.eligibility_reason,
+            "fit_score": opp.fit_score,
+            "fit_reason": opp.fit_reason,
+            "application_url": opp.application_url or opp.source_url,
+            "status": user_state.status if user_state else "radar",
+            "notes": user_state.notes if user_state else "",
+            "has_drafts": app_row is not None,
+            "drafts_dir": app_row.drafts_dir if app_row else "",
+        }
+
+    @app.post("/api/opportunity/{external_id}/state")
+    async def update_opportunity_state(external_id: str, body: StateUpdateRequest) -> dict[str, Any]:
+        async with get_session() as session:
+            opp = await get_opportunity_by_id(session, external_id)
+            if not opp:
+                raise HTTPException(status_code=404, detail="Opportunity not found")
+            row = await set_user_state(session, external_id, body.status, notes=body.notes)
+            await session.commit()
+            return {"status": row.status, "opportunity_id": external_id}
+
+    @app.post("/api/opportunity/{external_id}/apply")
+    async def trigger_apply_assistant(external_id: str) -> dict[str, Any]:
+        """Run the application assistant to generate tailored application drafts."""
+        from todaytech.apply.assistant import prepare_application
+
+        settings = get_settings()
+        profile = load_profile(settings.profile_path)
+
+        async with get_session() as session:
+            opp = await get_opportunity_by_id(session, external_id)
+            if not opp:
+                raise HTTPException(status_code=404, detail="Opportunity not found")
+            await set_user_state(session, external_id, "in_progress")
+            await session.commit()
+
+        # Run assistant
+        result_text = await prepare_application(opp, profile, settings)
+
+        return {
+            "success": True,
+            "opportunity_id": external_id,
+            "summary": result_text,
+        }
+
+    async def _safe_scan() -> None:
+        try:
+            await run_scan(force=True)
+        except Exception as exc:
+            log.warning("web.scan_failed", error=str(exc))
+
+    @app.post("/api/scan")
+    async def trigger_scan(background_tasks: BackgroundTasks) -> dict[str, str]:
+        background_tasks.add_task(_safe_scan)
+        return {"message": "Scan started in background"}
+
+    @app.get("/api/profile")
+    async def get_user_profile() -> dict[str, Any]:
+        settings = get_settings()
+        profile = load_profile(settings.profile_path)
+        if profile is None:
+            # Fall back to example profile
+            profile = load_profile(Path("profile.example.yaml"))
+
+        if profile is None:
+            return {
+                "name": "Builder",
+                "country": "Ghana",
+                "level": "undergraduate",
+                "year": 3,
+                "university": "University",
+                "field_of_study": "Computer Science",
+                "skills": ["Python", "JavaScript", "AI"],
+                "interests": ["Open Source", "Hackathons"],
+                "opportunity_types": ["hackathon", "fellowship", "scholarship", "grant", "internship"],
+                "max_application_fee": 0.0,
+            }
+
+        return {
+            "name": profile.name,
+            "country": profile.country,
+            "level": profile.level,
+            "year": profile.year,
+            "university": profile.university,
+            "field_of_study": profile.field_of_study,
+            "skills": profile.skills,
+            "interests": profile.interests,
+            "opportunity_types": profile.opportunity_types,
+            "max_application_fee": profile.max_application_fee,
+        }
+
+    @app.post("/api/profile")
+    async def save_user_profile(body: dict[str, Any]) -> dict[str, Any]:
+        settings = get_settings()
+        profile_file = settings.profile_path or Path("profile.yaml")
+
+        existing_data = {}
+        if profile_file.exists():
+            with open(profile_file, "r", encoding="utf-8") as f:
+                existing_data = yaml.safe_load(f) or {}
+        elif Path("profile.example.yaml").exists():
+            with open("profile.example.yaml", "r", encoding="utf-8") as f:
+                existing_data = yaml.safe_load(f) or {}
+
+        existing_data.update(body)
+
+        with open(profile_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(existing_data, f, sort_keys=False)
+
+        return {"success": True, "message": "Profile updated successfully"}
+
+    return app
+
+
+app = create_app()
