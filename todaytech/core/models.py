@@ -1,0 +1,188 @@
+"""Pydantic models for opportunities, user profiles, and extraction schemas."""
+
+from __future__ import annotations
+
+import enum
+from datetime import date, datetime
+from typing import Optional
+
+from pydantic import BaseModel, Field, HttpUrl
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+class OpportunityType(str, enum.Enum):
+    HACKATHON = "hackathon"
+    INTERNSHIP = "internship"
+    SCHOLARSHIP = "scholarship"
+    FELLOWSHIP = "fellowship"
+    GRANT = "grant"
+    PROGRAM = "program"
+    COMPETITION = "competition"
+    OTHER = "other"
+
+
+class EligibilityVerdict(str, enum.Enum):
+    ELIGIBLE = "Eligible"
+    LIKELY = "Likely"
+    CHECK = "Check"
+    NOT_ELIGIBLE = "Not eligible"
+
+
+class ApplicationStatus(str, enum.Enum):
+    SAVED = "saved"
+    DRAFTING = "drafting"
+    SUBMITTED = "submitted"
+    AWAITING = "awaiting"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    IGNORED = "ignored"
+
+
+class LanguageLevel(str, enum.Enum):
+    NATIVE = "native"
+    FLUENT = "fluent"
+    INTERMEDIATE = "intermediate"
+    BASIC = "basic"
+
+
+# ---------------------------------------------------------------------------
+# User Profile
+# ---------------------------------------------------------------------------
+
+class LanguageEntry(BaseModel):
+    language: str
+    level: LanguageLevel = LanguageLevel.INTERMEDIATE
+
+
+class ScoringWeights(BaseModel):
+    eligibility: int = 40
+    relevance: int = 25
+    benefit: int = 20
+    effort: int = 15
+
+
+class UserProfile(BaseModel):
+    """User profile loaded from profile.yaml."""
+
+    name: str = ""
+    country: str = ""
+    citizenship: list[str] = Field(default_factory=list)
+    city: str = ""
+
+    university: str = ""
+    level: str = "undergraduate"
+    year: int = 1
+    field_of_study: str = ""
+
+    skills: list[str] = Field(default_factory=list)
+    interests: list[str] = Field(default_factory=list)
+    causes: list[str] = Field(default_factory=list)
+
+    languages: list[LanguageEntry] = Field(default_factory=list)
+
+    opportunity_types: list[str] = Field(default_factory=lambda: [
+        "hackathon", "internship", "scholarship", "fellowship",
+        "grant", "program", "competition",
+    ])
+    regions: list[str] = Field(default_factory=lambda: ["Global"])
+    max_application_fee: float = 0
+
+    digest_time: str = "08:00"
+    timezone: str = "UTC"
+
+    scoring_weights: ScoringWeights = Field(default_factory=ScoringWeights)
+    source_packs: list[str] = Field(default_factory=list)
+
+    writing_samples: list[str] = Field(default_factory=list)
+    cv_path: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Opportunity (extraction schema)
+# ---------------------------------------------------------------------------
+
+class Opportunity(BaseModel):
+    """Normalized opportunity extracted from any source."""
+
+    id: Optional[str] = None
+    title: str
+    type: OpportunityType = OpportunityType.OTHER
+    organizer: str = ""
+    deadline: Optional[date] = None
+    start_date: Optional[date] = None
+    location: str = ""
+    mode: str = ""  # online, in-person, hybrid
+    cost: float = 0
+    eligibility_text: str = ""
+    countries_allowed: list[str] = Field(default_factory=list)
+    level_required: str = ""
+    field_required: str = ""
+    reward: str = ""
+    application_url: str = ""
+    source_url: str = ""
+    confidence: float = 0.0  # 0-1 extraction confidence
+
+    # Enriched fields (post-processing)
+    fit_score: int = 0  # 0-100
+    fit_reason: str = ""
+    eligibility_verdict: EligibilityVerdict = EligibilityVerdict.CHECK
+    eligibility_reason: str = ""
+    is_scam: bool = False
+    scam_reason: str = ""
+
+    # Metadata
+    source_name: str = ""
+    first_seen: Optional[datetime] = None
+    last_seen: Optional[datetime] = None
+    raw_text: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Digest item (lightweight view)
+# ---------------------------------------------------------------------------
+
+class DigestItem(BaseModel):
+    """Single item in a user-facing digest."""
+
+    id: str
+    title: str
+    type: OpportunityType
+    organizer: str
+    deadline: Optional[date] = None
+    fit_score: int = 0
+    fit_reason: str = ""
+    eligibility_verdict: EligibilityVerdict = EligibilityVerdict.CHECK
+    link: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Application
+# ---------------------------------------------------------------------------
+
+class ApplicationChecklist(BaseModel):
+    """Checklist for an application."""
+
+    opportunity_id: str
+    requirements: list[str] = Field(default_factory=list)
+    documents_needed: list[str] = Field(default_factory=list)
+    user_has: list[str] = Field(default_factory=list)
+    user_needs: list[str] = Field(default_factory=list)
+    internal_deadline: Optional[date] = None
+    status: ApplicationStatus = ApplicationStatus.SAVED
+
+
+# ---------------------------------------------------------------------------
+# Source config
+# ---------------------------------------------------------------------------
+
+class SourceConfig(BaseModel):
+    """A user-defined source from sources.yaml or a pack."""
+
+    name: str
+    type: str  # rss, url, subreddit, search_query, telegram_channel
+    value: str  # URL, subreddit name, query string, etc.
+    enabled: bool = True
+    tags: list[str] = Field(default_factory=list)

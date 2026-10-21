@@ -1,0 +1,244 @@
+"""SQLAlchemy async database layer with Alembic support."""
+
+from __future__ import annotations
+
+import enum
+from datetime import date, datetime
+from pathlib import Path
+from typing import Optional
+
+import structlog
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum,
+    Float,
+    Integer,
+    String,
+    Text,
+    func,
+    select,
+)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+log = structlog.get_logger()
+
+# ---------------------------------------------------------------------------
+# Engine / Session factory (populated by init_db)
+# ---------------------------------------------------------------------------
+
+_engine = None
+_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Tables
+# ---------------------------------------------------------------------------
+
+class OpportunityRow(Base):
+    __tablename__ = "opportunities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    external_id: Mapped[str] = mapped_column(String(256), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(512))
+    type: Mapped[str] = mapped_column(String(64), index=True)
+    organizer: Mapped[str] = mapped_column(String(256), default="")
+    deadline: Mapped[Optional[date]] = mapped_column(nullable=True)
+    start_date: Mapped[Optional[date]] = mapped_column(nullable=True)
+    location: Mapped[str] = mapped_column(String(256), default="")
+    mode: Mapped[str] = mapped_column(String(32), default="")
+    cost: Mapped[float] = mapped_column(Float, default=0)
+    eligibility_text: Mapped[str] = mapped_column(Text, default="")
+    countries_allowed: Mapped[str] = mapped_column(Text, default="")  # JSON list
+    level_required: Mapped[str] = mapped_column(String(64), default="")
+    field_required: Mapped[str] = mapped_column(String(128), default="")
+    reward: Mapped[str] = mapped_column(Text, default="")
+    application_url: Mapped[str] = mapped_column(String(1024), default="")
+    source_url: Mapped[str] = mapped_column(String(1024), default="")
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    fit_score: Mapped[int] = mapped_column(Integer, default=0)
+    fit_reason: Mapped[str] = mapped_column(Text, default="")
+    eligibility_verdict: Mapped[str] = mapped_column(String(32), default="Check")
+    eligibility_reason: Mapped[str] = mapped_column(Text, default="")
+    is_scam: Mapped[bool] = mapped_column(Boolean, default=False)
+    scam_reason: Mapped[str] = mapped_column(Text, default="")
+    source_name: Mapped[str] = mapped_column(String(128), default="")
+    raw_text: Mapped[str] = mapped_column(Text, default="")
+    first_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    last_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class ScanRow(Base):
+    __tablename__ = "scans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    sources_used: Mapped[str] = mapped_column(Text, default="")  # JSON list
+    items_found: Mapped[int] = mapped_column(Integer, default=0)
+    items_new: Mapped[int] = mapped_column(Integer, default=0)
+    errors: Mapped[str] = mapped_column(Text, default="")  # JSON list
+
+
+class UserStateRow(Base):
+    __tablename__ = "user_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    opportunity_id: Mapped[str] = mapped_column(String(256), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="saved")  # saved, ignored, applied
+    notes: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class ApplicationRow(Base):
+    __tablename__ = "applications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    opportunity_id: Mapped[str] = mapped_column(String(256), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="drafting")
+    requirements_json: Mapped[str] = mapped_column(Text, default="")
+    checklist_json: Mapped[str] = mapped_column(Text, default="")
+    drafts_dir: Mapped[str] = mapped_column(String(512), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class ReminderRow(Base):
+    __tablename__ = "reminders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    opportunity_id: Mapped[str] = mapped_column(String(256), index=True)
+    remind_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    message: Mapped[str] = mapped_column(Text, default="")
+    sent: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class SourceRow(Base):
+    __tablename__ = "sources"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256), unique=True)
+    type: Mapped[str] = mapped_column(String(64))
+    value: Mapped[str] = mapped_column(String(1024))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_checked: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+
+
+# ---------------------------------------------------------------------------
+# Init
+# ---------------------------------------------------------------------------
+
+async def init_db(database_url: str) -> None:
+    """Create engine, session factory, and all tables."""
+    global _engine, _session_factory
+
+    # Ensure data/ dir exists for SQLite
+    if "sqlite" in database_url:
+        Path("data").mkdir(parents=True, exist_ok=True)
+
+    _engine = create_async_engine(database_url, echo=False)
+    _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
+
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    log.info("database.initialized", url=database_url.split("://")[0] + "://***")
+
+
+def get_session() -> AsyncSession:
+    """Return a new async session."""
+    if _session_factory is None:
+        raise RuntimeError("Database not initialized — call init_db() first.")
+    return _session_factory()
+
+
+# ---------------------------------------------------------------------------
+# CRUD helpers
+# ---------------------------------------------------------------------------
+
+async def upsert_opportunity(session: AsyncSession, data: dict) -> tuple[OpportunityRow, bool]:
+    """Insert or update an opportunity.  Returns (row, is_new)."""
+    ext_id = data.get("external_id", "")
+    stmt = select(OpportunityRow).where(OpportunityRow.external_id == ext_id)
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+
+    if row is None:
+        row = OpportunityRow(**data)
+        session.add(row)
+        await session.flush()
+        return row, True
+
+    # Update existing
+    for key, value in data.items():
+        if key != "id" and key != "first_seen":
+            setattr(row, key, value)
+    await session.flush()
+    return row, False
+
+
+async def get_opportunity_by_id(session: AsyncSession, external_id: str) -> Optional[OpportunityRow]:
+    """Fetch a single opportunity by external ID."""
+    stmt = select(OpportunityRow).where(OpportunityRow.external_id == external_id)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_opportunities(
+    session: AsyncSession,
+    *,
+    type_filter: Optional[str] = None,
+    min_score: int = 0,
+    limit: int = 50,
+) -> list[OpportunityRow]:
+    """Fetch opportunities, ordered by fit score descending."""
+    stmt = select(OpportunityRow).order_by(OpportunityRow.fit_score.desc())
+    if type_filter:
+        stmt = stmt.where(OpportunityRow.type == type_filter)
+    if min_score > 0:
+        stmt = stmt.where(OpportunityRow.fit_score >= min_score)
+    stmt = stmt.limit(limit)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def set_user_state(
+    session: AsyncSession,
+    opportunity_id: str,
+    status: str,
+    notes: str = "",
+) -> UserStateRow:
+    """Save, ignore, or update status of an opportunity."""
+    stmt = select(UserStateRow).where(UserStateRow.opportunity_id == opportunity_id)
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row is None:
+        row = UserStateRow(opportunity_id=opportunity_id, status=status, notes=notes)
+        session.add(row)
+    else:
+        row.status = status
+        if notes:
+            row.notes = notes
+    await session.flush()
+    return row
+
+
+async def get_saved_opportunities(session: AsyncSession) -> list[UserStateRow]:
+    """Get all saved opportunities."""
+    stmt = select(UserStateRow).where(UserStateRow.status == "saved")
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_last_scan(session: AsyncSession) -> Optional[ScanRow]:
+    """Get the most recent scan."""
+    stmt = select(ScanRow).order_by(ScanRow.started_at.desc()).limit(1)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
