@@ -1,0 +1,83 @@
+# ─────────────────────────────────────────────────────────────
+# TodayTech — User Profile
+# Copy this file to profile.yaml and fill in YOUR details.
+# NEVER commit your profile.yaml — it is gitignored.
+# Run `todaytech init` for an interactive setup wizard.
+# ─────────────────────────────────────────────────────────────
+
+# ── Personal ─────────────────────────────────────────────────
+name: "Your Full Name"
+country: "Your Country"              # e.g. Ghana, Nigeria, India, USA
+citizenship:                          # list if dual/multi
+  - "Your Citizenship"
+city: "Your City"
+
+# ── Education ────────────────────────────────────────────────
+university: "Your University"
+level: "undergraduate"               # undergraduate | masters | phd | bootcamp | self-taught | graduated
+year: 2                              # year of study (1-6) or years since graduation
+field_of_study: "Computer Science"   # e.g. Computer Science, Electrical Engineering, Design
+
+# ── Skills & Interests ──────────────────────────────────────
+skills:
+  - "Python"
+  - "JavaScript"
+  - "Machine Learning"
+interests:
+  - "AI for Social Good"
+  - "Open Source"
+  - "EdTech"
+causes:                               # optional — social causes you care about
+  - "Education Access"
+  - "Climate Action"
+
+# ── Languages ────────────────────────────────────────────────
+languages:
+  - language: "English"
+    level: "native"                   # native | fluent | intermediate | basic
+  - language: "French"
+    level: "intermediate"
+
+# ── Opportunity Preferences ─────────────────────────────────
+opportunity_types:                    # which types to scan for
+  - hackathon
+  - internship
+  - scholarship
+  - fellowship
+  - grant
+  - program
+  - competition
+
+regions:                              # regions you can travel to / apply in
+  - "Global"                          # or: Africa, Europe, North America, Asia, etc.
+  - "Africa"
+
+max_application_fee: 0                # max fee (USD) you're willing to pay; 0 = free only
+
+# ── Notification Settings ───────────────────────────────────
+digest_time: "08:00"                  # 24-hour format
+timezone: "UTC"                       # IANA timezone, e.g. Africa/Accra, America/New_York
+
+# ── Scoring Weights (must sum to 100) ───────────────────────
+scoring_weights:
+  eligibility: 40
+  relevance: 25
+  benefit: 20
+  effort: 15
+
+# ── Source Packs ─────────────────────────────────────────────
+# Enable community source packs from sources/packs/
+source_packs:
+  # - ghana
+  # - nigeria
+  # - india
+
+# ── Writing Samples (optional) ──────────────────────────────
+# Paths to local files the application assistant uses to match your voice.
+# These stay on your machine and are never uploaded.
+writing_samples: []
+  # - "data/samples/personal_statement.txt"
+  # - "data/samples/blog_post.md"
+
+# ── CV (optional) ───────────────────────────────────────────
+cv_path: ""  # e.g. "data/cv.pdf" — used by the application assistant
