@@ -1,0 +1,49 @@
+# ── Secrets & user data (NEVER commit) ──
+.env
+profile.yaml
+data/
+*.db
+*.sqlite3
+
+# ── Drafts & logs ──
+data/drafts/
+logs/
+*.log
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Docker ──
+docker-compose.override.yml
+
+# ── Coverage & test ──
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Pre-commit ──
+.secrets.baseline
