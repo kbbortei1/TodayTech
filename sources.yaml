@@ -1,0 +1,62 @@
+# ─────────────────────────────────────────────────────────────
+# TodayTech — Custom Sources
+# Add your own sources here. No code changes needed.
+# ─────────────────────────────────────────────────────────────
+
+sources:
+  # ── RSS Feeds ──────────────────────────────────────────────
+  - name: "Opportunity Desk"
+    type: rss
+    value: "https://www.opportunitydesk.org/feed/"
+    enabled: true
+    tags: [scholarship, fellowship, global]
+
+  - name: "Scholarship Positions"
+    type: rss
+    value: "https://www.scholarshippositions.com/feed/"
+    enabled: true
+    tags: [scholarship, global]
+
+  # ── Search Queries ─────────────────────────────────────────
+  # These are run through your configured search APIs.
+  - name: "Tech Internships"
+    type: search_query
+    value: "tech internship 2025 open application"
+    enabled: true
+    tags: [internship]
+
+  - name: "STEM Scholarships"
+    type: search_query
+    value: "STEM scholarship 2025 undergraduate application open"
+    enabled: true
+    tags: [scholarship]
+
+  # ── Subreddits ─────────────────────────────────────────────
+  # Requires Reddit API credentials in .env
+  - name: "r/scholarships"
+    type: subreddit
+    value: "scholarships"
+    enabled: true
+    tags: [scholarship]
+
+  - name: "r/hackathons"
+    type: subreddit
+    value: "hackathons"
+    enabled: true
+    tags: [hackathon]
+
+  # ── Telegram Channels ─────────────────────────────────────
+  # Requires Telegram API credentials in .env
+  # - name: "Opportunities Channel"
+  #   type: telegram_channel
+  #   value: "opportunities_channel"
+  #   enabled: true
+  #   tags: [mixed]
+
+  # ── Direct URLs ────────────────────────────────────────────
+  # Pages that will be fetched and parsed for opportunities.
+  # - name: "My University Scholarships"
+  #   type: url
+  #   value: "https://example.edu/scholarships"
+  #   enabled: true
+  #   tags: [scholarship, local]

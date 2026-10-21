@@ -1,0 +1,103 @@
+# ─────────────────────────────────────────────────────────────
+# TodayTech Source Pack: Ghana 🇬🇭
+#
+# Community-contributed sources for Ghanaian students.
+# Enable in profile.yaml:
+#   source_packs:
+#     - ghana
+#
+# Contributing: See CONTRIBUTING.md for how to add/update packs.
+# ─────────────────────────────────────────────────────────────
+
+pack:
+  name: "Ghana"
+  description: "Scholarships, hackathons, and programs for Ghanaian students"
+  country: "Ghana"
+  maintained_by: "TodayTech Community"
+
+sources:
+  # ── Scholarship Portals ────────────────────────────────────
+  - name: "Ghana Scholarship Secretariat"
+    type: search_query
+    value: "Ghana Scholarship Secretariat application open"
+    tags: [scholarship, government]
+
+  - name: "GetFundedAfrica Ghana"
+    type: search_query
+    value: "GetFundedAfrica Ghana scholarship grant"
+    tags: [scholarship, grant]
+
+  - name: "Mastercard Foundation Scholars"
+    type: search_query
+    value: "Mastercard Foundation Scholars Program Ghana application"
+    tags: [scholarship, fully-funded]
+
+  # ── University Sources ─────────────────────────────────────
+  - name: "University of Ghana Scholarships"
+    type: search_query
+    value: "University of Ghana scholarship 2025 application"
+    tags: [scholarship, university]
+
+  - name: "KNUST Scholarships"
+    type: search_query
+    value: "KNUST scholarship opportunity 2025"
+    tags: [scholarship, university]
+
+  - name: "Ashesi University Scholarships"
+    type: search_query
+    value: "Ashesi University scholarship financial aid"
+    tags: [scholarship, university]
+
+  # ── Tech Communities ───────────────────────────────────────
+  - name: "Ghana Tech Community"
+    type: search_query
+    value: "Ghana tech hackathon 2025"
+    tags: [hackathon, tech]
+
+  - name: "DevFest Ghana"
+    type: search_query
+    value: "DevFest Ghana Google Developer"
+    tags: [hackathon, tech, google]
+
+  - name: "Ghana AI/ML"
+    type: search_query
+    value: "Ghana AI machine learning program fellowship"
+    tags: [program, ai]
+
+  # ── Regional Opportunities ─────────────────────────────────
+  - name: "Africa-wide Scholarships"
+    type: search_query
+    value: "Africa scholarship undergraduate 2025 open"
+    tags: [scholarship, africa]
+
+  - name: "West Africa Hackathons"
+    type: search_query
+    value: "West Africa hackathon technology 2025"
+    tags: [hackathon, africa]
+
+  - name: "DAAD Ghana"
+    type: search_query
+    value: "DAAD scholarship Ghana application"
+    tags: [scholarship, germany]
+
+  - name: "Chevening Ghana"
+    type: search_query
+    value: "Chevening scholarship Ghana application open"
+    tags: [scholarship, uk]
+
+  - name: "Fulbright Ghana"
+    type: search_query
+    value: "Fulbright scholarship Ghana application"
+    tags: [scholarship, usa]
+
+  # ── Subreddits ─────────────────────────────────────────────
+  - name: "r/ghana"
+    type: subreddit
+    value: "ghana"
+    tags: [general, community]
+
+  # ── RSS Feeds ──────────────────────────────────────────────
+  - name: "Opportunity Desk Africa"
+    type: rss
+    value: "https://www.opportunitydesk.org/category/africa/feed/"
+    tags: [scholarship, fellowship, africa]
