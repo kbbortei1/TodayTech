@@ -1,0 +1,65 @@
+name: Scheduled Opportunity Scan & Digest
+
+# Allows users to self-host TodayTech scans entirely on GitHub Actions for free.
+# Configure your secrets in your repo Settings -> Secrets and variables -> Actions:
+# - GEMINI_API_KEY (or GROQ_API_KEY / OPENAI_API_KEY)
+# - TELEGRAM_BOT_TOKEN
+# - TELEGRAM_ALLOWED_USER_IDS
+
+on:
+  schedule:
+    # Runs at 08:00 UTC daily (adjust to your preference)
+    - cron: "0 8 * * *"
+  workflow_dispatch: # Allows manual trigger from the Actions tab
+
+jobs:
+  scan-and-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Restore opportunity database cache
+        id: db-cache
+        uses: actions/cache@v4
+        with:
+          path: data/
+          key: todaytech-data-${{ github.run_id }}
+          restore-keys: |
+            todaytech-data-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Run scan and send digest
+        env:
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER || 'gemini' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALLOWED_USER_IDS: ${{ secrets.TELEGRAM_ALLOWED_USER_IDS }}
+          TODAYTECH_DATA_DIR: ./data
+        run: |
+          mkdir -p data
+          # Run full opportunity scan
+          todaytech scan
+          # If Telegram configured, send today's digest notification
+          todaytech digest --notify
+
+      - name: Save updated database artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: todaytech-data
+          path: data/
+          retention-days: 14
