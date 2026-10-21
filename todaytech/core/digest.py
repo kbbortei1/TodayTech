@@ -7,7 +7,6 @@ Each item: title, type, organizer, deadline, fit score, eligibility, link.
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import Optional
 
 from todaytech.core.database import OpportunityRow
 

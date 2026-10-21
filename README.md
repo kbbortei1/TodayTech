@@ -29,29 +29,29 @@ Searching for opportunities manually means drowning in noise: expired deadlines,
 
 ```mermaid
 flowchart TD
-    subgraph Sources [Multi-Source Ingestion]
-        RSS[RSS / Atom Feeds]
-        DEVPOST[Devpost / Devfolio / MLH]
-        REDDIT[Reddit Subreddits via PRAW]
-        TELEGRAM[Public Telegram Channels]
-        SEARCH[Tavily / Brave / Google Search]
+    subgraph Sources ["Multi-Source Ingestion"]
+        RSS["RSS / Atom Feeds"]
+        DEVPOST["Devpost / Devfolio / MLH"]
+        REDDIT["Reddit Subreddits via PRAW"]
+        TELEGRAM["Public Telegram Channels"]
+        SEARCH["Tavily / Brave / Google Search"]
     end
 
-    subgraph Pipeline [Core Pipeline]
-        COLLECT[Collector Manager]
-        DEDUPE[Deduplication & Canonicalizer]
-        SCAM[Scam & Quality Filter]
-        ELIG[Eligibility Engine (Rules + LLM)]
-        SCORE[Weighted Fit Scorer]
-        DB[(SQLite / PostgreSQL)]
+    subgraph Pipeline ["Core Pipeline"]
+        COLLECT["Collector Manager"]
+        DEDUPE["Deduplication & Canonicalizer"]
+        SCAM["Scam & Quality Filter"]
+        ELIG["Eligibility Engine (Rules + LLM)"]
+        SCORE["Weighted Fit Scorer"]
+        DB[("SQLite / PostgreSQL Database")]
     end
 
-    subgraph Interfaces [User Interfaces]
-        DIGEST[Digest Formatter]
-        WEB[Editorial Web Dashboard]
-        CLI[TodayTech CLI]
-        BOT[Telegram Bot]
-        APPLY[Application Assistant]
+    subgraph Interfaces ["User Interfaces"]
+        DIGEST["Digest Formatter"]
+        WEB["Editorial Web Dashboard"]
+        CLI["TodayTech CLI"]
+        BOT["Telegram Bot"]
+        APPLY["Application Assistant"]
     end
 
     Sources --> COLLECT

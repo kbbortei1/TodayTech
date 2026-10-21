@@ -39,12 +39,14 @@ class RSSCollector(Collector):
             try:
                 feed = feedparser.parse(feed_url)
                 for entry in feed.entries[:15]:
-                    results.append({
-                        "title": entry.get("title", ""),
-                        "source_url": entry.get("link", ""),
-                        "raw_text": entry.get("summary", "")[:500],
-                        "source_name": f"rss:{feed.feed.get('title', feed_url)[:30]}",
-                    })
+                    results.append(
+                        {
+                            "title": entry.get("title", ""),
+                            "source_url": entry.get("link", ""),
+                            "raw_text": entry.get("summary", "")[:500],
+                            "source_name": f"rss:{feed.feed.get('title', feed_url)[:30]}",
+                        }
+                    )
                 log.debug("rss.parsed", url=feed_url, entries=len(feed.entries))
             except Exception as exc:
                 log.warning("rss.feed_failed", url=feed_url, error=str(exc))

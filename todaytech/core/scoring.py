@@ -6,8 +6,7 @@ Score components: eligibility (40), relevance (25), benefit (20), effort (15).
 
 from __future__ import annotations
 
-from datetime import date, timedelta
-from typing import Any
+from datetime import date
 
 import structlog
 
@@ -20,6 +19,7 @@ log = structlog.get_logger()
 # ---------------------------------------------------------------------------
 # Component scorers (0-100 each, then weighted)
 # ---------------------------------------------------------------------------
+
 
 def _score_eligibility(opp: Opportunity) -> int:
     """Score based on eligibility verdict."""
@@ -67,13 +67,28 @@ def _score_benefit(opp: Opportunity) -> int:
     score = 30  # base
 
     high_value_keywords = [
-        "full scholarship", "fully funded", "stipend", "paid",
-        "prize", "award", "grant", "funding", "sponsorship",
-        "job offer", "full-time", "mentorship",
+        "full scholarship",
+        "fully funded",
+        "stipend",
+        "paid",
+        "prize",
+        "award",
+        "grant",
+        "funding",
+        "sponsorship",
+        "job offer",
+        "full-time",
+        "mentorship",
     ]
     medium_value_keywords = [
-        "certificate", "networking", "experience", "training",
-        "partial", "discount", "swag", "recognition",
+        "certificate",
+        "networking",
+        "experience",
+        "training",
+        "partial",
+        "discount",
+        "swag",
+        "recognition",
     ]
 
     for kw in high_value_keywords:
@@ -174,6 +189,7 @@ async def _llm_relevance(
 # ---------------------------------------------------------------------------
 # Main scorer
 # ---------------------------------------------------------------------------
+
 
 async def compute_fit_score(
     opp: Opportunity,

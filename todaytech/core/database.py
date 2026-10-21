@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import enum
 from datetime import date, datetime
 from pathlib import Path
-from typing import Optional
 
 import structlog
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Enum,
     Float,
     Integer,
     String,
@@ -29,7 +26,7 @@ log = structlog.get_logger()
 # ---------------------------------------------------------------------------
 
 _engine = None
-_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
+_session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
 class Base(DeclarativeBase):
@@ -40,6 +37,7 @@ class Base(DeclarativeBase):
 # Tables
 # ---------------------------------------------------------------------------
 
+
 class OpportunityRow(Base):
     __tablename__ = "opportunities"
 
@@ -48,8 +46,8 @@ class OpportunityRow(Base):
     title: Mapped[str] = mapped_column(String(512))
     type: Mapped[str] = mapped_column(String(64), index=True)
     organizer: Mapped[str] = mapped_column(String(256), default="")
-    deadline: Mapped[Optional[date]] = mapped_column(nullable=True)
-    start_date: Mapped[Optional[date]] = mapped_column(nullable=True)
+    deadline: Mapped[date | None] = mapped_column(nullable=True)
+    start_date: Mapped[date | None] = mapped_column(nullable=True)
     location: Mapped[str] = mapped_column(String(256), default="")
     mode: Mapped[str] = mapped_column(String(32), default="")
     cost: Mapped[float] = mapped_column(Float, default=0)
@@ -70,7 +68,9 @@ class OpportunityRow(Base):
     source_name: Mapped[str] = mapped_column(String(128), default="")
     raw_text: Mapped[str] = mapped_column(Text, default="")
     first_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    last_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    last_seen: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
 
 class ScanRow(Base):
@@ -78,7 +78,7 @@ class ScanRow(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sources_used: Mapped[str] = mapped_column(Text, default="")  # JSON list
     items_found: Mapped[int] = mapped_column(Integer, default=0)
     items_new: Mapped[int] = mapped_column(Integer, default=0)
@@ -92,7 +92,9 @@ class UserStateRow(Base):
     opportunity_id: Mapped[str] = mapped_column(String(256), index=True)
     status: Mapped[str] = mapped_column(String(32), default="saved")  # saved, ignored, applied
     notes: Mapped[str] = mapped_column(Text, default="")
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
 
 class ApplicationRow(Base):
@@ -105,7 +107,9 @@ class ApplicationRow(Base):
     checklist_json: Mapped[str] = mapped_column(Text, default="")
     drafts_dir: Mapped[str] = mapped_column(String(512), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
 
 class ReminderRow(Base):
@@ -126,7 +130,7 @@ class SourceRow(Base):
     type: Mapped[str] = mapped_column(String(64))
     value: Mapped[str] = mapped_column(String(1024))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    last_checked: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_checked: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_error: Mapped[str] = mapped_column(Text, default="")
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -134,6 +138,7 @@ class SourceRow(Base):
 # ---------------------------------------------------------------------------
 # Init
 # ---------------------------------------------------------------------------
+
 
 async def init_db(database_url: str) -> None:
     """Create engine, session factory, and all tables."""
@@ -163,6 +168,7 @@ def get_session() -> AsyncSession:
 # CRUD helpers
 # ---------------------------------------------------------------------------
 
+
 async def upsert_opportunity(session: AsyncSession, data: dict) -> tuple[OpportunityRow, bool]:
     """Insert or update an opportunity.  Returns (row, is_new)."""
     ext_id = data.get("external_id", "")
@@ -184,7 +190,7 @@ async def upsert_opportunity(session: AsyncSession, data: dict) -> tuple[Opportu
     return row, False
 
 
-async def get_opportunity_by_id(session: AsyncSession, external_id: str) -> Optional[OpportunityRow]:
+async def get_opportunity_by_id(session: AsyncSession, external_id: str) -> OpportunityRow | None:
     """Fetch a single opportunity by external ID."""
     stmt = select(OpportunityRow).where(OpportunityRow.external_id == external_id)
     result = await session.execute(stmt)
@@ -194,7 +200,7 @@ async def get_opportunity_by_id(session: AsyncSession, external_id: str) -> Opti
 async def get_opportunities(
     session: AsyncSession,
     *,
-    type_filter: Optional[str] = None,
+    type_filter: str | None = None,
     min_score: int = 0,
     limit: int = 50,
 ) -> list[OpportunityRow]:
@@ -237,7 +243,7 @@ async def get_saved_opportunities(session: AsyncSession) -> list[UserStateRow]:
     return list(result.scalars().all())
 
 
-async def get_last_scan(session: AsyncSession) -> Optional[ScanRow]:
+async def get_last_scan(session: AsyncSession) -> ScanRow | None:
     """Get the most recent scan."""
     stmt = select(ScanRow).order_by(ScanRow.started_at.desc()).limit(1)
     result = await session.execute(stmt)

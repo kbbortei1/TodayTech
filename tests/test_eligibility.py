@@ -1,6 +1,7 @@
 """Tests for the eligibility verification engine."""
 
 from datetime import date, timedelta
+
 from todaytech.core.eligibility import (
     _check_country,
     _check_deadline,
@@ -22,7 +23,7 @@ def _make_profile(**kwargs) -> UserProfile:
         "country": "Ghana",
         "citizenship": ["Ghanaian"],
         "level": "undergraduate",
-        "year": "3rd",
+        "year": 3,
         "field_of_study": "Computer Science",
         "skills": ["Python", "FastAPI"],
         "interests": ["AI", "Open Source"],

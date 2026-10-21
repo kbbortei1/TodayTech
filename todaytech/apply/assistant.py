@@ -14,9 +14,7 @@ NEVER submits anything on the user's behalf.
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import structlog
 from docx import Document
@@ -25,7 +23,6 @@ from todaytech.core.config import Settings, load_profile
 from todaytech.core.database import (
     ApplicationRow,
     OpportunityRow,
-    get_opportunity_by_id,
     get_session,
 )
 from todaytech.core.llm import create_llm_client_from_settings
@@ -236,9 +233,8 @@ async def run_application_assistant(
             except Exception:
                 pass
         if samples:
-            voice_instruction = (
-                "Match the writer's voice from these samples:\n"
-                + "\n---\n".join(samples)
+            voice_instruction = "Match the writer's voice from these samples:\n" + "\n---\n".join(
+                samples
             )
 
     draft_types = []
@@ -308,7 +304,9 @@ async def run_application_assistant(
 
             lines.append("💡 **Project Ideas:**")
             for idea in hack_data.get("ideas", [])[:3]:
-                lines.append(f"  • **{idea.get('name', 'Idea')}** — {idea.get('description', '')[:100]}")
+                lines.append(
+                    f"  • **{idea.get('name', 'Idea')}** — {idea.get('description', '')[:100]}"
+                )
                 lines.append(f"    Stack: {', '.join(idea.get('tech_stack', []))}")
 
             build_plan = hack_data.get("build_plan_48h", {})

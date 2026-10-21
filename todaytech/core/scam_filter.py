@@ -6,7 +6,6 @@ wording, suspicious or shortened links, and other red flags.
 
 from __future__ import annotations
 
-import re
 from urllib.parse import urlparse
 
 import structlog
@@ -37,25 +36,48 @@ _SCAM_PHRASES = [
 ]
 
 _SUSPICIOUS_DOMAINS = [
-    "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly",
-    "is.gd", "buff.ly", "adf.ly", "shorte.st",
+    "bit.ly",
+    "tinyurl.com",
+    "t.co",
+    "goo.gl",
+    "ow.ly",
+    "is.gd",
+    "buff.ly",
+    "adf.ly",
+    "shorte.st",
 ]
 
 _TRUSTED_DOMAINS = [
-    "devpost.com", "mlh.io", "devfolio.co", "unstop.com",
-    "hackerearth.com", "lablab.ai", "kaggle.com",
-    "chevening.org", "daad.de", "erasmusplus.ec.europa.eu",
-    "fulbright.org", "mastercardfdn.org",
-    "google.com", "microsoft.com", "meta.com", "aws.amazon.com",
-    "github.com", "ycombinator.com", "techstars.com",
-    "outreachy.org", "opportunitydesk.org",
-    "reddit.com", "linkedin.com",
+    "devpost.com",
+    "mlh.io",
+    "devfolio.co",
+    "unstop.com",
+    "hackerearth.com",
+    "lablab.ai",
+    "kaggle.com",
+    "chevening.org",
+    "daad.de",
+    "erasmusplus.ec.europa.eu",
+    "fulbright.org",
+    "mastercardfdn.org",
+    "google.com",
+    "microsoft.com",
+    "meta.com",
+    "aws.amazon.com",
+    "github.com",
+    "ycombinator.com",
+    "techstars.com",
+    "outreachy.org",
+    "opportunitydesk.org",
+    "reddit.com",
+    "linkedin.com",
 ]
 
 
 # ---------------------------------------------------------------------------
 # Checker
 # ---------------------------------------------------------------------------
+
 
 def check_scam(opp: Opportunity) -> tuple[bool, str]:
     """Check if an opportunity looks suspicious.
@@ -78,7 +100,7 @@ def check_scam(opp: Opportunity) -> tuple[bool, str]:
     for url_field in [opp.application_url, opp.source_url]:
         if url_field:
             parsed = urlparse(url_field)
-            domain = parsed.netloc.lower().lstrip("www.")
+            domain = parsed.netloc.lower().removeprefix("www.")
             if domain in _SUSPICIOUS_DOMAINS:
                 reasons.append(f"Uses URL shortener: {domain}")
 
@@ -104,5 +126,5 @@ def is_trusted_source(url: str) -> bool:
     if not url:
         return False
     parsed = urlparse(url)
-    domain = parsed.netloc.lower().lstrip("www.")
+    domain = parsed.netloc.lower().removeprefix("www.")
     return any(trusted in domain for trusted in _TRUSTED_DOMAINS)

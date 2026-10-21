@@ -67,7 +67,7 @@ scoring_weights:
 
 # ── Source Packs ─────────────────────────────────────────────
 # Enable community source packs from sources/packs/
-source_packs:
+source_packs: []
   # - ghana
   # - nigeria
   # - india

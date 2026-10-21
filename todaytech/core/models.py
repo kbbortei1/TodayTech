@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import enum
 from datetime import date, datetime
-from typing import Optional
 
-from pydantic import BaseModel, Field, HttpUrl
-
+from pydantic import BaseModel, Field, field_validator
 
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
+
 
 class OpportunityType(str, enum.Enum):
     HACKATHON = "hackathon"
@@ -52,6 +51,7 @@ class LanguageLevel(str, enum.Enum):
 # User Profile
 # ---------------------------------------------------------------------------
 
+
 class LanguageEntry(BaseModel):
     language: str
     level: LanguageLevel = LanguageLevel.INTERMEDIATE
@@ -83,10 +83,17 @@ class UserProfile(BaseModel):
 
     languages: list[LanguageEntry] = Field(default_factory=list)
 
-    opportunity_types: list[str] = Field(default_factory=lambda: [
-        "hackathon", "internship", "scholarship", "fellowship",
-        "grant", "program", "competition",
-    ])
+    opportunity_types: list[str] = Field(
+        default_factory=lambda: [
+            "hackathon",
+            "internship",
+            "scholarship",
+            "fellowship",
+            "grant",
+            "program",
+            "competition",
+        ]
+    )
     regions: list[str] = Field(default_factory=lambda: ["Global"])
     max_application_fee: float = 0
 
@@ -99,20 +106,50 @@ class UserProfile(BaseModel):
     writing_samples: list[str] = Field(default_factory=list)
     cv_path: str = ""
 
+    @field_validator("year", mode="before")
+    @classmethod
+    def _coerce_year(cls, v: object) -> int:
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str):
+            digits = "".join(ch for ch in v if ch.isdigit())
+            if digits:
+                return int(digits)
+        return 1
+
+    @field_validator(
+        "citizenship",
+        "skills",
+        "interests",
+        "causes",
+        "languages",
+        "opportunity_types",
+        "regions",
+        "source_packs",
+        "writing_samples",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_none_to_list(cls, v: object) -> object:
+        if v is None:
+            return []
+        return v
+
 
 # ---------------------------------------------------------------------------
 # Opportunity (extraction schema)
 # ---------------------------------------------------------------------------
 
+
 class Opportunity(BaseModel):
     """Normalized opportunity extracted from any source."""
 
-    id: Optional[str] = None
+    id: str | None = None
     title: str
     type: OpportunityType = OpportunityType.OTHER
     organizer: str = ""
-    deadline: Optional[date] = None
-    start_date: Optional[date] = None
+    deadline: date | None = None
+    start_date: date | None = None
     location: str = ""
     mode: str = ""  # online, in-person, hybrid
     cost: float = 0
@@ -135,14 +172,15 @@ class Opportunity(BaseModel):
 
     # Metadata
     source_name: str = ""
-    first_seen: Optional[datetime] = None
-    last_seen: Optional[datetime] = None
+    first_seen: datetime | None = None
+    last_seen: datetime | None = None
     raw_text: str = ""
 
 
 # ---------------------------------------------------------------------------
 # Digest item (lightweight view)
 # ---------------------------------------------------------------------------
+
 
 class DigestItem(BaseModel):
     """Single item in a user-facing digest."""
@@ -151,7 +189,7 @@ class DigestItem(BaseModel):
     title: str
     type: OpportunityType
     organizer: str
-    deadline: Optional[date] = None
+    deadline: date | None = None
     fit_score: int = 0
     fit_reason: str = ""
     eligibility_verdict: EligibilityVerdict = EligibilityVerdict.CHECK
@@ -162,6 +200,7 @@ class DigestItem(BaseModel):
 # Application
 # ---------------------------------------------------------------------------
 
+
 class ApplicationChecklist(BaseModel):
     """Checklist for an application."""
 
@@ -170,13 +209,14 @@ class ApplicationChecklist(BaseModel):
     documents_needed: list[str] = Field(default_factory=list)
     user_has: list[str] = Field(default_factory=list)
     user_needs: list[str] = Field(default_factory=list)
-    internal_deadline: Optional[date] = None
+    internal_deadline: date | None = None
     status: ApplicationStatus = ApplicationStatus.SAVED
 
 
 # ---------------------------------------------------------------------------
 # Source config
 # ---------------------------------------------------------------------------
+
 
 class SourceConfig(BaseModel):
     """A user-defined source from sources.yaml or a pack."""

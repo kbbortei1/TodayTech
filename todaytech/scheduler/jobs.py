@@ -6,9 +6,10 @@ Deadline reminders fire at 7, 3, and 1 day(s) before each deadline.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, time as dt_time
-from zoneinfo import ZoneInfo
+from datetime import date, timedelta
+from datetime import time as dt_time
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import structlog
 from telegram.ext import Application
@@ -64,9 +65,9 @@ async def _daily_digest_job(context: Any) -> None:
     settings: Settings = context.job.data["settings"]
 
     try:
-        from todaytech.core.pipeline import run_scan
         from todaytech.core.database import get_opportunities, get_session
         from todaytech.core.digest import format_digest
+        from todaytech.core.pipeline import run_scan
 
         result = await run_scan()
 
@@ -97,7 +98,8 @@ async def _deadline_reminder_job(context: Any) -> None:
 
     try:
         from sqlalchemy import select
-        from todaytech.core.database import OpportunityRow, UserStateRow, get_session
+
+        from todaytech.core.database import OpportunityRow, get_session
 
         today = date.today()
         reminder_days = [7, 3, 1]

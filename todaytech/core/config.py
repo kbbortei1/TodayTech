@@ -6,21 +6,19 @@ exits immediately with a human-readable error message.
 
 from __future__ import annotations
 
-import sys
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 import yaml
-from pydantic import Field, model_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from todaytech.core.models import UserProfile
 
-
 # ---------------------------------------------------------------------------
 # Settings
 # ---------------------------------------------------------------------------
+
 
 class Settings(BaseSettings):
     """All environment-level configuration.  Loaded from ``.env``."""
@@ -81,6 +79,7 @@ class Settings(BaseSettings):
     def validate_runtime(self, require_search_and_llm: bool = True) -> None:
         """Fail fast if critical keys are missing for live bot or scan operations."""
         import os
+
         if os.environ.get("TODAYTECH_SKIP_KEY_VALIDATION") == "1":
             return
 
@@ -94,24 +93,28 @@ class Settings(BaseSettings):
             )
 
         if require_search_and_llm:
-            has_search = any([
-                self.tavily_api_key,
-                self.brave_search_api_key,
-                self.google_search_api_key and self.google_search_cx,
-                self.serper_api_key,
-                self.serpapi_api_key,
-            ])
+            has_search = any(
+                [
+                    self.tavily_api_key,
+                    self.brave_search_api_key,
+                    self.google_search_api_key and self.google_search_cx,
+                    self.serper_api_key,
+                    self.serpapi_api_key,
+                ]
+            )
             if not has_search:
                 errors.append(
                     "At least one Search API key is required "
                     "(TAVILY, BRAVE_SEARCH, GOOGLE_SEARCH, SERPER, or SERPAPI)."
                 )
 
-            has_llm = any([
-                self.gemini_api_key,
-                self.groq_api_key,
-                self.openrouter_api_key,
-            ])
+            has_llm = any(
+                [
+                    self.gemini_api_key,
+                    self.groq_api_key,
+                    self.openrouter_api_key,
+                ]
+            )
             if not has_llm:
                 errors.append(
                     "At least one LLM provider key is required "
@@ -119,7 +122,11 @@ class Settings(BaseSettings):
                 )
 
         if errors:
-            msg = "\n❌  TodayTech configuration errors:\n\n" + "\n".join(f"   • {e}" for e in errors) + "\n\n   Copy .env.example → .env and fill in the values.\n"
+            msg = (
+                "\n❌  TodayTech configuration errors:\n\n"
+                + "\n".join(f"   • {e}" for e in errors)
+                + "\n\n   Copy .env.example → .env and fill in the values.\n"
+            )
             raise ValueError(msg)
 
     # ── Helpers ───────────────────────────────────────────────
@@ -159,7 +166,8 @@ class Settings(BaseSettings):
 # Profile loader
 # ---------------------------------------------------------------------------
 
-def load_profile(path: Path | None = None) -> Optional[UserProfile]:
+
+def load_profile(path: Path | None = None) -> UserProfile | None:
     """Load user profile from YAML.  Returns None if file doesn't exist."""
     p = path or Path("profile.yaml")
     if not p.exists():
@@ -172,6 +180,7 @@ def load_profile(path: Path | None = None) -> Optional[UserProfile]:
 # ---------------------------------------------------------------------------
 # Singleton accessor
 # ---------------------------------------------------------------------------
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

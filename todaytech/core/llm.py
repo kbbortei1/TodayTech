@@ -10,11 +10,10 @@ Secrets are never logged.
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 import structlog
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 log = structlog.get_logger()
 
@@ -166,7 +165,7 @@ class LLMClient:
         json_mode: bool = False,
     ) -> str:
         """Generate text, trying providers in order until one succeeds."""
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
 
         for name, key_or_url in self._providers:
             try:
@@ -193,7 +192,7 @@ class LLMClient:
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines)
         return json.loads(cleaned)
 

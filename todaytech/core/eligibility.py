@@ -6,8 +6,7 @@ The engine never says "Eligible" when confidence is low; it falls back to
 
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Optional
+from datetime import date
 
 import structlog
 
@@ -21,14 +20,15 @@ log = structlog.get_logger()
 # Rule-based checks
 # ---------------------------------------------------------------------------
 
-def _check_deadline(opp: Opportunity) -> Optional[tuple[EligibilityVerdict, str]]:
+
+def _check_deadline(opp: Opportunity) -> tuple[EligibilityVerdict, str] | None:
     """If the deadline has passed, not eligible."""
     if opp.deadline and opp.deadline < date.today():
         return EligibilityVerdict.NOT_ELIGIBLE, f"Deadline passed ({opp.deadline})"
     return None
 
 
-def _check_country(opp: Opportunity, profile: UserProfile) -> Optional[tuple[EligibilityVerdict, str]]:
+def _check_country(opp: Opportunity, profile: UserProfile) -> tuple[EligibilityVerdict, str] | None:
     """Check country restrictions."""
     if not opp.countries_allowed:
         return None  # No restriction stated
@@ -44,7 +44,7 @@ def _check_country(opp: Opportunity, profile: UserProfile) -> Optional[tuple[Eli
     )
 
 
-def _check_level(opp: Opportunity, profile: UserProfile) -> Optional[tuple[EligibilityVerdict, str]]:
+def _check_level(opp: Opportunity, profile: UserProfile) -> tuple[EligibilityVerdict, str] | None:
     """Check education level requirement."""
     if not opp.level_required:
         return None
@@ -60,7 +60,7 @@ def _check_level(opp: Opportunity, profile: UserProfile) -> Optional[tuple[Eligi
     return None
 
 
-def _check_field(opp: Opportunity, profile: UserProfile) -> Optional[tuple[EligibilityVerdict, str]]:
+def _check_field(opp: Opportunity, profile: UserProfile) -> tuple[EligibilityVerdict, str] | None:
     """Check field of study requirement."""
     if not opp.field_required:
         return None
@@ -78,7 +78,7 @@ def _check_field(opp: Opportunity, profile: UserProfile) -> Optional[tuple[Eligi
     )
 
 
-def _check_fee(opp: Opportunity, profile: UserProfile) -> Optional[tuple[EligibilityVerdict, str]]:
+def _check_fee(opp: Opportunity, profile: UserProfile) -> tuple[EligibilityVerdict, str] | None:
     """Check application fee."""
     if opp.cost > 0 and opp.cost > profile.max_application_fee:
         return EligibilityVerdict.NOT_ELIGIBLE, (
@@ -181,6 +181,7 @@ async def llm_eligibility_check(
 # Combined check
 # ---------------------------------------------------------------------------
 
+
 async def check_eligibility(
     opp: Opportunity,
     profile: UserProfile,
@@ -192,7 +193,11 @@ async def check_eligibility(
     # If rules give a definitive answer, use it
     if verdict in (EligibilityVerdict.ELIGIBLE, EligibilityVerdict.NOT_ELIGIBLE):
         # If eligible by rules but has vague eligibility text, double-check
-        if verdict == EligibilityVerdict.ELIGIBLE and opp.eligibility_text and len(opp.eligibility_text) > 50:
+        if (
+            verdict == EligibilityVerdict.ELIGIBLE
+            and opp.eligibility_text
+            and len(opp.eligibility_text) > 50
+        ):
             llm_verdict, llm_reason = await llm_eligibility_check(opp, profile, llm)
             if llm_verdict == EligibilityVerdict.NOT_ELIGIBLE:
                 return llm_verdict, llm_reason

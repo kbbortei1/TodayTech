@@ -1,12 +1,13 @@
 """Tests for the scoring engine."""
 
 from datetime import date, timedelta
+
 import pytest
+
 from todaytech.core.models import (
     EligibilityVerdict,
     Opportunity,
     OpportunityType,
-    ScoringWeights,
     UserProfile,
 )
 from todaytech.core.scoring import (
@@ -23,7 +24,7 @@ def _make_profile(**kwargs) -> UserProfile:
         "country": "Ghana",
         "citizenship": ["Ghanaian"],
         "level": "undergraduate",
-        "year": "3rd",
+        "year": 3,
         "field_of_study": "Computer Science",
         "skills": ["Python", "FastAPI", "React", "Docker"],
         "interests": ["AI", "Open Source", "Cloud"],

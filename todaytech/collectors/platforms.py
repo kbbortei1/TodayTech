@@ -8,7 +8,7 @@ helper.
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import httpx
 import structlog
@@ -42,7 +42,7 @@ class DevpostCollector(Collector):
     async def collect(self, queries: list[str]) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         url = "https://devpost.com/api/hackathons"
-        params = {
+        params: dict[str, str | int] = {
             "status[]": "open",
             "order_by": "deadline",
             "page": 1,
@@ -55,19 +55,21 @@ class DevpostCollector(Collector):
             data = resp.json()
 
         for h in data.get("hackathons", []):
-            results.append({
-                "title": h.get("title", ""),
-                "type": "hackathon",
-                "organizer": h.get("organization_name", ""),
-                "deadline": h.get("submission_period_dates", ""),
-                "location": h.get("displayed_location", {}).get("location", "Online"),
-                "mode": "online" if h.get("online_only") else "hybrid",
-                "reward": ", ".join(p.get("label", "") for p in h.get("prizes", [])),
-                "application_url": h.get("url", ""),
-                "source_url": h.get("url", ""),
-                "source_name": "devpost",
-                "raw_text": h.get("tagline", ""),
-            })
+            results.append(
+                {
+                    "title": h.get("title", ""),
+                    "type": "hackathon",
+                    "organizer": h.get("organization_name", ""),
+                    "deadline": h.get("submission_period_dates", ""),
+                    "location": h.get("displayed_location", {}).get("location", "Online"),
+                    "mode": "online" if h.get("online_only") else "hybrid",
+                    "reward": ", ".join(p.get("label", "") for p in h.get("prizes", [])),
+                    "application_url": h.get("url", ""),
+                    "source_url": h.get("url", ""),
+                    "source_name": "devpost",
+                    "raw_text": h.get("tagline", ""),
+                }
+            )
         return results
 
 
@@ -101,16 +103,18 @@ class MLHCollector(Collector):
             loc_el = event.select_one(".event-location")
 
             if name_el:
-                results.append({
-                    "title": name_el.get_text(strip=True),
-                    "type": "hackathon",
-                    "organizer": "MLH",
-                    "deadline": date_el.get_text(strip=True) if date_el else "",
-                    "location": loc_el.get_text(strip=True) if loc_el else "",
-                    "application_url": link_el["href"] if link_el else "",
-                    "source_url": url,
-                    "source_name": "mlh",
-                })
+                results.append(
+                    {
+                        "title": name_el.get_text(strip=True),
+                        "type": "hackathon",
+                        "organizer": "MLH",
+                        "deadline": date_el.get_text(strip=True) if date_el else "",
+                        "location": loc_el.get_text(strip=True) if loc_el else "",
+                        "application_url": link_el["href"] if link_el else "",
+                        "source_url": url,
+                        "source_name": "mlh",
+                    }
+                )
         return results
 
 
@@ -144,20 +148,22 @@ class DevfolioCollector(Collector):
 
         for hit in data.get("hits", {}).get("hits", []):
             src = hit.get("_source", {})
-            results.append({
-                "title": src.get("name", ""),
-                "type": "hackathon",
-                "organizer": src.get("org_name", "Devfolio"),
-                "deadline": src.get("ends_at", ""),
-                "start_date": src.get("starts_at", ""),
-                "location": src.get("location", "Online"),
-                "mode": "online" if src.get("is_online") else "in-person",
-                "reward": str(src.get("prize_amount", "")),
-                "application_url": f"https://devfolio.co/hackathons/{src.get('slug', '')}",
-                "source_url": f"https://devfolio.co/hackathons/{src.get('slug', '')}",
-                "source_name": "devfolio",
-                "raw_text": src.get("tagline", ""),
-            })
+            results.append(
+                {
+                    "title": src.get("name", ""),
+                    "type": "hackathon",
+                    "organizer": src.get("org_name", "Devfolio"),
+                    "deadline": src.get("ends_at", ""),
+                    "start_date": src.get("starts_at", ""),
+                    "location": src.get("location", "Online"),
+                    "mode": "online" if src.get("is_online") else "in-person",
+                    "reward": str(src.get("prize_amount", "")),
+                    "application_url": f"https://devfolio.co/hackathons/{src.get('slug', '')}",
+                    "source_url": f"https://devfolio.co/hackathons/{src.get('slug', '')}",
+                    "source_name": "devfolio",
+                    "raw_text": src.get("tagline", ""),
+                }
+            )
         return results
 
 
@@ -197,17 +203,19 @@ class UnstopCollector(Collector):
             elif "scholarship" in item.get("type", "").lower():
                 opp_type = "scholarship"
 
-            results.append({
-                "title": item.get("title", ""),
-                "type": opp_type,
-                "organizer": item.get("organisation", {}).get("name", ""),
-                "deadline": item.get("regnEnd", ""),
-                "reward": item.get("prize", ""),
-                "application_url": f"https://unstop.com/{item.get('public_url', '')}",
-                "source_url": f"https://unstop.com/{item.get('public_url', '')}",
-                "source_name": "unstop",
-                "raw_text": item.get("short_desc", ""),
-            })
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "type": opp_type,
+                    "organizer": item.get("organisation", {}).get("name", ""),
+                    "deadline": item.get("regnEnd", ""),
+                    "reward": item.get("prize", ""),
+                    "application_url": f"https://unstop.com/{item.get('public_url', '')}",
+                    "source_url": f"https://unstop.com/{item.get('public_url', '')}",
+                    "source_name": "unstop",
+                    "raw_text": item.get("short_desc", ""),
+                }
+            )
         return results
 
 
@@ -238,14 +246,20 @@ class HackerEarthCollector(Collector):
             title_el = card.select_one(".challenge-name")
             link_el = card.select_one("a[href]")
             if title_el:
-                results.append({
-                    "title": title_el.get_text(strip=True),
-                    "type": "competition",
-                    "organizer": "HackerEarth",
-                    "application_url": urljoin("https://www.hackerearth.com", link_el["href"]) if link_el else "",
-                    "source_url": url,
-                    "source_name": "hackerearth",
-                })
+                results.append(
+                    {
+                        "title": title_el.get_text(strip=True),
+                        "type": "competition",
+                        "organizer": "HackerEarth",
+                        "application_url": urljoin(
+                            "https://www.hackerearth.com", str(link_el["href"])
+                        )
+                        if link_el
+                        else "",
+                        "source_url": url,
+                        "source_name": "hackerearth",
+                    }
+                )
         return results
 
 
@@ -278,16 +292,19 @@ class LablabCollector(Collector):
             if title_el:
                 link = ""
                 if link_el:
-                    href = link_el.get("href", "")
+                    raw_href = link_el.get("href", "")
+                    href = str(raw_href) if raw_href else ""
                     link = href if href.startswith("http") else urljoin("https://lablab.ai", href)
-                results.append({
-                    "title": title_el.get_text(strip=True),
-                    "type": "hackathon",
-                    "organizer": "lablab.ai",
-                    "application_url": link,
-                    "source_url": url,
-                    "source_name": "lablab",
-                })
+                results.append(
+                    {
+                        "title": title_el.get_text(strip=True),
+                        "type": "hackathon",
+                        "organizer": "lablab.ai",
+                        "application_url": link,
+                        "source_url": url,
+                        "source_name": "lablab",
+                    }
+                )
         return results
 
 
@@ -317,14 +334,17 @@ class KaggleCollector(Collector):
         for card in soup.select("[class*='competition'], .competition-list-item, li"):
             title_el = card.select_one("a[href*='/competitions/']")
             if title_el:
-                href = title_el.get("href", "")
+                raw_href = title_el.get("href", "")
+                href = str(raw_href) if raw_href else ""
                 full_url = href if href.startswith("http") else f"https://www.kaggle.com{href}"
-                results.append({
-                    "title": title_el.get_text(strip=True),
-                    "type": "competition",
-                    "organizer": "Kaggle",
-                    "application_url": full_url,
-                    "source_url": full_url,
-                    "source_name": "kaggle",
-                })
+                results.append(
+                    {
+                        "title": title_el.get_text(strip=True),
+                        "type": "competition",
+                        "organizer": "Kaggle",
+                        "application_url": full_url,
+                        "source_url": full_url,
+                        "source_name": "kaggle",
+                    }
+                )
         return results

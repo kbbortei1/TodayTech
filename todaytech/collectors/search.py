@@ -7,7 +7,6 @@ legitimately through search engines.  Rotates providers when quota is low.
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import quote_plus
 
 import httpx
 import structlog
@@ -70,12 +69,14 @@ class TavilyCollector(SearchCollector):
 
         results = []
         for item in data.get("results", []):
-            results.append({
-                "title": item.get("title", ""),
-                "source_url": item.get("url", ""),
-                "raw_text": item.get("content", ""),
-                "source_name": "tavily",
-            })
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "source_url": item.get("url", ""),
+                    "raw_text": item.get("content", ""),
+                    "source_name": "tavily",
+                }
+            )
         return results
 
 
@@ -100,7 +101,7 @@ class BraveSearchCollector(SearchCollector):
             "Accept-Encoding": "gzip",
             "X-Subscription-Token": self.settings.brave_search_api_key,
         }
-        params = {"q": query, "count": 10}
+        params: dict[str, str | int] = {"q": query, "count": 10}
 
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(url, headers=headers, params=params)
@@ -109,12 +110,14 @@ class BraveSearchCollector(SearchCollector):
 
         results = []
         for item in data.get("web", {}).get("results", []):
-            results.append({
-                "title": item.get("title", ""),
-                "source_url": item.get("url", ""),
-                "raw_text": item.get("description", ""),
-                "source_name": "brave",
-            })
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "source_url": item.get("url", ""),
+                    "raw_text": item.get("description", ""),
+                    "source_name": "brave",
+                }
+            )
         return results
 
 
@@ -148,12 +151,14 @@ class GoogleSearchCollector(SearchCollector):
 
         results = []
         for item in data.get("items", []):
-            results.append({
-                "title": item.get("title", ""),
-                "source_url": item.get("link", ""),
-                "raw_text": item.get("snippet", ""),
-                "source_name": "google",
-            })
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "source_url": item.get("link", ""),
+                    "raw_text": item.get("snippet", ""),
+                    "source_name": "google",
+                }
+            )
         return results
 
 
@@ -186,12 +191,14 @@ class SerperCollector(SearchCollector):
 
         results = []
         for item in data.get("organic", []):
-            results.append({
-                "title": item.get("title", ""),
-                "source_url": item.get("link", ""),
-                "raw_text": item.get("snippet", ""),
-                "source_name": "serper",
-            })
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "source_url": item.get("link", ""),
+                    "raw_text": item.get("snippet", ""),
+                    "source_name": "serper",
+                }
+            )
         return results
 
 
@@ -225,10 +232,12 @@ class SerpAPICollector(SearchCollector):
 
         results = []
         for item in data.get("organic_results", []):
-            results.append({
-                "title": item.get("title", ""),
-                "source_url": item.get("link", ""),
-                "raw_text": item.get("snippet", ""),
-                "source_name": "serpapi",
-            })
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "source_url": item.get("link", ""),
+                    "raw_text": item.get("snippet", ""),
+                    "source_name": "serpapi",
+                }
+            )
         return results

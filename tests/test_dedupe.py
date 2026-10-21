@@ -18,7 +18,9 @@ class TestCanonicalizeUrl:
         assert canonicalize_url("https://example.com/page#section") == "https://example.com/page"
 
     def test_removes_query_params(self):
-        assert canonicalize_url("https://example.com/page?utm_source=x") == "https://example.com/page"
+        assert (
+            canonicalize_url("https://example.com/page?utm_source=x") == "https://example.com/page"
+        )
 
     def test_empty_string(self):
         assert canonicalize_url("") == ""

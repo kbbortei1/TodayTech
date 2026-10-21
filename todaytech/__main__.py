@@ -7,7 +7,6 @@ import structlog
 
 from todaytech.core.config import get_settings
 
-
 log = structlog.get_logger()
 
 

@@ -5,25 +5,23 @@ Provides REST APIs and serves the editorial web interface.
 
 from __future__ import annotations
 
-import asyncio
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 import yaml
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from todaytech.core.config import Settings, get_settings, load_profile
+from todaytech.core.config import get_settings, load_profile
 from todaytech.core.database import (
     ApplicationRow,
     OpportunityRow,
-    ScanRow,
     UserStateRow,
     get_last_scan,
     get_opportunities,
@@ -48,14 +46,14 @@ class StateUpdateRequest(BaseModel):
 
 
 class ProfileUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    country: Optional[str] = None
-    level: Optional[str] = None
-    university: Optional[str] = None
-    field_of_study: Optional[str] = None
-    skills: Optional[list[str]] = None
-    interests: Optional[list[str]] = None
-    opportunity_types: Optional[list[str]] = None
+    name: str | None = None
+    country: str | None = None
+    level: str | None = None
+    university: str | None = None
+    field_of_study: str | None = None
+    skills: list[str] | None = None
+    interests: list[str] | None = None
+    opportunity_types: list[str] | None = None
 
 
 async def _seed_demo_if_empty(session) -> None:
@@ -224,7 +222,9 @@ def create_app() -> FastAPI:
         today = date.today()
         async with get_session() as session:
             opps = await get_opportunities(session, limit=200)
-            saved = await session.execute(select(UserStateRow).where(UserStateRow.status == "saved"))
+            saved = await session.execute(
+                select(UserStateRow).where(UserStateRow.status == "saved")
+            )
             saved_count = len(saved.scalars().all())
 
             drafting = await session.execute(
@@ -235,7 +235,9 @@ def create_app() -> FastAPI:
             last_scan = await get_last_scan(session)
 
         closing_soon_count = sum(
-            1 for o in opps if o.deadline and (o.deadline - today) <= timedelta(days=7) and o.deadline >= today
+            1
+            for o in opps
+            if o.deadline and (o.deadline - today) <= timedelta(days=7) and o.deadline >= today
         )
 
         return {
@@ -243,20 +245,24 @@ def create_app() -> FastAPI:
             "closing_soon_count": closing_soon_count,
             "saved_count": saved_count,
             "drafting_count": drafting_count,
-            "last_scan": last_scan.finished_at.isoformat() if last_scan and last_scan.finished_at else None,
+            "last_scan": last_scan.finished_at.isoformat()
+            if last_scan and last_scan.finished_at
+            else None,
         }
 
     @app.get("/api/opportunities")
     async def list_opportunities(
-        type: Optional[str] = Query(None),
-        status: Optional[str] = Query("radar"),  # radar, saved, in_progress, applied, all
-        query: Optional[str] = Query(None),
+        type: str | None = Query(None),
+        status: str | None = Query("radar"),  # radar, saved, in_progress, applied, all
+        query: str | None = Query(None),
         min_score: int = Query(0),
         closing_soon: bool = Query(False),
     ) -> list[dict[str, Any]]:
         today = date.today()
         async with get_session() as session:
-            opps = await get_opportunities(session, type_filter=type, min_score=min_score, limit=100)
+            opps = await get_opportunities(
+                session, type_filter=type, min_score=min_score, limit=100
+            )
 
             user_states_stmt = select(UserStateRow)
             res = await session.execute(user_states_stmt)
@@ -270,48 +276,59 @@ def create_app() -> FastAPI:
             opp_status = user_states.get(opp.external_id, "radar")
 
             # Status filter
-            if status == "saved" and opp_status != "saved":
-                continue
-            elif status in ("in_progress", "drafting") and opp_status not in ("drafting", "in_progress"):
-                continue
-            elif status == "applied" and opp_status != "applied":
-                continue
-            elif status == "radar" and opp_status == "ignored":
+            if (
+                status == "saved"
+                and opp_status != "saved"
+                or status in ("in_progress", "drafting")
+                and opp_status not in ("drafting", "in_progress")
+                or status == "applied"
+                and opp_status != "applied"
+                or status == "radar"
+                and opp_status == "ignored"
+            ):
                 continue
 
             # Closing soon filter
             if closing_soon:
-                if not opp.deadline or (opp.deadline - today) > timedelta(days=7) or opp.deadline < today:
+                if (
+                    not opp.deadline
+                    or (opp.deadline - today) > timedelta(days=7)
+                    or opp.deadline < today
+                ):
                     continue
 
             # Query search
             if query:
                 q = query.lower()
-                combined = f"{opp.title} {opp.organizer} {opp.reward} {opp.eligibility_text}".lower()
+                combined = (
+                    f"{opp.title} {opp.organizer} {opp.reward} {opp.eligibility_text}".lower()
+                )
                 if q not in combined:
                     continue
 
             days_left = (opp.deadline - today).days if opp.deadline else None
 
-            results.append({
-                "id": opp.external_id,
-                "title": opp.title,
-                "type": opp.type,
-                "organizer": opp.organizer or "Independent",
-                "deadline": opp.deadline.isoformat() if opp.deadline else None,
-                "days_left": days_left,
-                "mode": opp.mode or "Online",
-                "location": opp.location or "Global",
-                "cost": opp.cost,
-                "reward": opp.reward,
-                "eligibility_verdict": opp.eligibility_verdict,
-                "eligibility_reason": opp.eligibility_reason,
-                "fit_score": opp.fit_score,
-                "fit_reason": opp.fit_reason,
-                "application_url": opp.application_url or opp.source_url,
-                "source_name": opp.source_name,
-                "status": opp_status,
-            })
+            results.append(
+                {
+                    "id": opp.external_id,
+                    "title": opp.title,
+                    "type": opp.type,
+                    "organizer": opp.organizer or "Independent",
+                    "deadline": opp.deadline.isoformat() if opp.deadline else None,
+                    "days_left": days_left,
+                    "mode": opp.mode or "Online",
+                    "location": opp.location or "Global",
+                    "cost": opp.cost,
+                    "reward": opp.reward,
+                    "eligibility_verdict": opp.eligibility_verdict,
+                    "eligibility_reason": opp.eligibility_reason,
+                    "fit_score": opp.fit_score,
+                    "fit_reason": opp.fit_reason,
+                    "application_url": opp.application_url or opp.source_url,
+                    "source_name": opp.source_name,
+                    "status": opp_status,
+                }
+            )
 
         return results
 
@@ -359,7 +376,9 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/opportunity/{external_id}/state")
-    async def update_opportunity_state(external_id: str, body: StateUpdateRequest) -> dict[str, Any]:
+    async def update_opportunity_state(
+        external_id: str, body: StateUpdateRequest
+    ) -> dict[str, Any]:
         async with get_session() as session:
             opp = await get_opportunity_by_id(session, external_id)
             if not opp:
@@ -371,10 +390,9 @@ def create_app() -> FastAPI:
     @app.post("/api/opportunity/{external_id}/apply")
     async def trigger_apply_assistant(external_id: str) -> dict[str, Any]:
         """Run the application assistant to generate tailored application drafts."""
-        from todaytech.apply.assistant import prepare_application
+        from todaytech.apply.assistant import run_application_assistant
 
         settings = get_settings()
-        profile = load_profile(settings.profile_path)
 
         async with get_session() as session:
             opp = await get_opportunity_by_id(session, external_id)
@@ -384,7 +402,7 @@ def create_app() -> FastAPI:
             await session.commit()
 
         # Run assistant
-        result_text = await prepare_application(opp, profile, settings)
+        result_text = await run_application_assistant(external_id, settings)
 
         return {
             "success": True,
@@ -421,7 +439,13 @@ def create_app() -> FastAPI:
                 "field_of_study": "Computer Science",
                 "skills": ["Python", "JavaScript", "AI"],
                 "interests": ["Open Source", "Hackathons"],
-                "opportunity_types": ["hackathon", "fellowship", "scholarship", "grant", "internship"],
+                "opportunity_types": [
+                    "hackathon",
+                    "fellowship",
+                    "scholarship",
+                    "grant",
+                    "internship",
+                ],
                 "max_application_fee": 0.0,
             }
 
@@ -443,12 +467,12 @@ def create_app() -> FastAPI:
         settings = get_settings()
         profile_file = settings.profile_path or Path("profile.yaml")
 
-        existing_data = {}
+        existing_data: dict[str, Any] = {}
         if profile_file.exists():
-            with open(profile_file, "r", encoding="utf-8") as f:
+            with open(profile_file, encoding="utf-8") as f:
                 existing_data = yaml.safe_load(f) or {}
         elif Path("profile.example.yaml").exists():
-            with open("profile.example.yaml", "r", encoding="utf-8") as f:
+            with open("profile.example.yaml", encoding="utf-8") as f:
                 existing_data = yaml.safe_load(f) or {}
 
         existing_data.update(body)

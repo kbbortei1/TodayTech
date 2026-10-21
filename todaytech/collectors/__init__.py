@@ -7,18 +7,10 @@ handle their own retries, backoff, timeouts, and health tracking.
 from __future__ import annotations
 
 import abc
-from datetime import datetime
-from typing import Any, Optional
+from datetime import datetime, timezone
+from typing import Any
 
 import structlog
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
-
-from todaytech.core.models import Opportunity
 
 log = structlog.get_logger()
 
@@ -28,8 +20,8 @@ class CollectorHealth:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self.last_success: Optional[datetime] = None
-        self.last_error: Optional[str] = None
+        self.last_success: datetime | None = None
+        self.last_error: str | None = None
         self.consecutive_failures: int = 0
         self.total_items: int = 0
 
@@ -38,7 +30,7 @@ class CollectorHealth:
         return self.consecutive_failures < 5
 
     def record_success(self, items: int) -> None:
-        self.last_success = datetime.utcnow()
+        self.last_success = datetime.now(timezone.utc)
         self.last_error = None
         self.consecutive_failures = 0
         self.total_items += items
@@ -108,9 +100,11 @@ _registry: dict[str, type[Collector]] = {}
 
 def register_collector(name: str):
     """Decorator to register a collector class."""
+
     def decorator(cls: type[Collector]):
         _registry[name] = cls
         return cls
+
     return decorator
 
 

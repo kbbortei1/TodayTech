@@ -22,7 +22,7 @@ if sys.platform == "win32":
 import click
 import yaml
 from rich.console import Console
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Prompt
 
 console = Console(force_terminal=True, legacy_windows=False)
 
@@ -164,10 +164,10 @@ def scan(force: bool) -> None:
 
     async def _run():
         from todaytech.core.config import get_settings
-        from todaytech.core.logging import setup_logging
-        from todaytech.core.database import init_db, get_session, get_opportunities
-        from todaytech.core.pipeline import run_scan
+        from todaytech.core.database import get_opportunities, get_session, init_db
         from todaytech.core.digest import format_digest
+        from todaytech.core.logging import setup_logging
+        from todaytech.core.pipeline import run_scan
 
         settings = get_settings()
         setup_logging(settings.log_level)
@@ -199,6 +199,7 @@ def scan(force: bool) -> None:
 def run() -> None:
     """Start the Telegram bot (main application)."""
     from todaytech.__main__ import main
+
     main()
 
 
@@ -213,9 +214,9 @@ def digest() -> None:
 
     async def _run():
         from todaytech.core.config import get_settings
-        from todaytech.core.logging import setup_logging
-        from todaytech.core.database import init_db, get_session, get_opportunities
+        from todaytech.core.database import get_opportunities, get_session, init_db
         from todaytech.core.digest import format_digest
+        from todaytech.core.logging import setup_logging
 
         settings = get_settings()
         setup_logging(settings.log_level)
@@ -245,10 +246,12 @@ def digest() -> None:
 def web(host: str, port: int) -> None:
     """Start the TodayTech Web Dashboard."""
     import uvicorn
-    console.print(f"\n🚀 [bold green]Starting TodayTech Web Dashboard[/bold green] at http://{host}:{port}\n")
+
+    console.print(
+        f"\n🚀 [bold green]Starting TodayTech Web Dashboard[/bold green] at http://{host}:{port}\n"
+    )
     uvicorn.run("todaytech.web.app:create_app", host=host, port=port, factory=True, reload=False)
 
 
 if __name__ == "__main__":
     cli()
-

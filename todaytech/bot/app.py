@@ -5,10 +5,8 @@ The bot ONLY responds to the Telegram user ID set in TELEGRAM_USER_ID.
 
 from __future__ import annotations
 
-import json
 import re
 from datetime import date
-from typing import Any
 
 import structlog
 from telegram import Update
@@ -23,10 +21,8 @@ from telegram.ext import (
 from todaytech.core.config import Settings, load_profile
 from todaytech.core.database import (
     get_opportunities,
-    get_opportunity_by_id,
     get_saved_opportunities,
     get_session,
-    init_db,
     set_user_state,
 )
 from todaytech.core.digest import format_digest
@@ -40,8 +36,10 @@ log = structlog.get_logger()
 # Security middleware
 # ---------------------------------------------------------------------------
 
+
 def auth_required(func):
     """Decorator: only allow the configured user ID."""
+
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         settings: Settings = context.bot_data["settings"]
         if update.effective_user and update.effective_user.id != settings.telegram_user_id:
@@ -51,6 +49,7 @@ def auth_required(func):
             )
             return  # Silently ignore
         return await func(update, context)
+
     return wrapper
 
 
@@ -58,13 +57,14 @@ def auth_required(func):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 async def _send_long(update: Update, text: str) -> None:
     """Send a message, splitting at 4096 chars if needed (Telegram limit)."""
     max_len = 4000
     if len(text) <= max_len:
         await update.message.reply_text(text, parse_mode="Markdown", disable_web_page_preview=True)
         return
-    chunks = [text[i:i + max_len] for i in range(0, len(text), max_len)]
+    chunks = [text[i : i + max_len] for i in range(0, len(text), max_len)]
     for chunk in chunks:
         await update.message.reply_text(chunk, parse_mode="Markdown", disable_web_page_preview=True)
 
@@ -72,6 +72,7 @@ async def _send_long(update: Update, text: str) -> None:
 # ---------------------------------------------------------------------------
 # Command handlers
 # ---------------------------------------------------------------------------
+
 
 @auth_required
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -138,13 +139,20 @@ async def cmd_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     text = update.message.text.lower().strip()
     # Extract type
     type_map = {
-        "hackathon": "hackathon", "hackathons": "hackathon",
-        "scholarship": "scholarship", "scholarships": "scholarship",
-        "internship": "internship", "internships": "internship",
-        "fellowship": "fellowship", "fellowships": "fellowship",
-        "grant": "grant", "grants": "grant",
-        "program": "program", "programs": "program",
-        "competition": "competition", "competitions": "competition",
+        "hackathon": "hackathon",
+        "hackathons": "hackathon",
+        "scholarship": "scholarship",
+        "scholarships": "scholarship",
+        "internship": "internship",
+        "internships": "internship",
+        "fellowship": "fellowship",
+        "fellowships": "fellowship",
+        "grant": "grant",
+        "grants": "grant",
+        "program": "program",
+        "programs": "program",
+        "competition": "competition",
+        "competitions": "competition",
     }
 
     opp_type = None
@@ -154,7 +162,9 @@ async def cmd_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             break
 
     if not opp_type:
-        await update.message.reply_text("❓ Which type? hackathons, scholarships, internships, fellowships, grants, programs, or competitions?")
+        await update.message.reply_text(
+            "❓ Which type? hackathons, scholarships, internships, fellowships, grants, programs, or competitions?"
+        )
         return
 
     async with get_session() as session:
@@ -182,13 +192,17 @@ async def cmd_details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     async with get_session() as session:
         # Try exact match or prefix match
         from sqlalchemy import select
+
         from todaytech.core.database import OpportunityRow
+
         stmt = select(OpportunityRow).where(OpportunityRow.external_id.startswith(opp_id))
         result = await session.execute(stmt)
         opp = result.scalar_one_or_none()
 
     if not opp:
-        await update.message.reply_text(f"❌ Opportunity `{opp_id}` not found.", parse_mode="Markdown")
+        await update.message.reply_text(
+            f"❌ Opportunity `{opp_id}` not found.", parse_mode="Markdown"
+        )
         return
 
     details = _format_details(opp)
@@ -236,7 +250,9 @@ async def cmd_saved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         saved = await get_saved_opportunities(session)
 
     if not saved:
-        await update.message.reply_text("📭 No saved opportunities yet. Use `save <id>` to save one.")
+        await update.message.reply_text(
+            "📭 No saved opportunities yet. Use `save <id>` to save one."
+        )
         return
 
     lines = ["📌 **Saved Opportunities**\n"]
@@ -249,6 +265,7 @@ async def cmd_saved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_deadlines(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle 'deadlines' — show upcoming deadlines."""
     from sqlalchemy import select
+
     from todaytech.core.database import OpportunityRow
 
     async with get_session() as session:
@@ -282,10 +299,13 @@ async def cmd_apply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     opp_id = match.group(1)
-    await update.message.reply_text(f"📝 Starting application assistant for `{opp_id}`...", parse_mode="Markdown")
+    await update.message.reply_text(
+        f"📝 Starting application assistant for `{opp_id}`...", parse_mode="Markdown"
+    )
 
     try:
         from todaytech.apply.assistant import run_application_assistant
+
         settings: Settings = context.bot_data["settings"]
         result = await run_application_assistant(opp_id, settings)
         await _send_long(update, result)
@@ -305,12 +325,15 @@ async def cmd_add_source(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     url = match.group(1)
     # TODO: append to sources.yaml
-    await update.message.reply_text(f"✅ Added source: {url}\nIt will be included in the next scan.")
+    await update.message.reply_text(
+        f"✅ Added source: {url}\nIt will be included in the next scan."
+    )
 
 
 # ---------------------------------------------------------------------------
 # Natural language router
 # ---------------------------------------------------------------------------
+
 
 @auth_required
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -351,6 +374,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 # Details formatter
 # ---------------------------------------------------------------------------
 
+
 def _format_details(opp) -> str:
     """Format full details of an opportunity."""
     lines = [
@@ -365,7 +389,7 @@ def _format_details(opp) -> str:
         f"🎁 Reward: {opp.reward or 'Not stated'}",
     ]
 
-    lines.append(f"\n**Eligibility:**")
+    lines.append("\n**Eligibility:**")
     lines.append(f"  Verdict: {opp.eligibility_verdict}")
     lines.append(f"  Reason: {opp.eligibility_reason}")
     if opp.eligibility_text:
@@ -392,6 +416,7 @@ def _format_details(opp) -> str:
 # Bot startup
 # ---------------------------------------------------------------------------
 
+
 async def start_bot(settings: Settings) -> None:
     """Start the Telegram bot and scheduler."""
     settings.validate_runtime(require_search_and_llm=False)
@@ -415,6 +440,7 @@ async def start_bot(settings: Settings) -> None:
 
     # Keep running
     import asyncio
+
     stop_event = asyncio.Event()
     try:
         await stop_event.wait()

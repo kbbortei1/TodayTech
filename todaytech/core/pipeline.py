@@ -7,9 +7,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from datetime import date, datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 import structlog
@@ -67,9 +66,7 @@ def generate_queries(profile: UserProfile) -> list[str]:
         queries.append(
             f"site:linkedin.com scholarship {profile.country} students {profile.field_of_study}"
         )
-        queries.append(
-            f"site:linkedin.com internship {profile.field_of_study} {profile.country}"
-        )
+        queries.append(f"site:linkedin.com internship {profile.field_of_study} {profile.country}")
 
     return queries
 
@@ -104,7 +101,9 @@ def generate_external_id(item: dict[str, Any]) -> str:
     return hashlib.sha256(title.encode()).hexdigest()[:16]
 
 
-def is_duplicate(item: dict[str, Any], seen: dict[str, dict[str, Any]], threshold: int = 85) -> bool:
+def is_duplicate(
+    item: dict[str, Any], seen: dict[str, dict[str, Any]], threshold: int = 85
+) -> bool:
     """Check if an item is a duplicate via URL match or fuzzy title match."""
     ext_id = generate_external_id(item)
     if ext_id in seen:
@@ -282,7 +281,10 @@ async def run_scan(
             # Skip scoring for ineligible
             if verdict != EligibilityVerdict.NOT_ELIGIBLE:
                 opp.fit_score, opp.fit_reason = await compute_fit_score(
-                    opp, profile, llm, use_llm_relevance=False  # heuristic for speed
+                    opp,
+                    profile,
+                    llm,
+                    use_llm_relevance=False,  # heuristic for speed
                 )
 
             # Store
@@ -314,9 +316,7 @@ async def run_scan(
         "items_new": new_count,
         "sources": source_names,
         "errors": errors,
-        "unhealthy_sources": [
-            c.name for c in collectors if not c.health.is_healthy
-        ],
+        "unhealthy_sources": [c.name for c in collectors if not c.health.is_healthy],
     }
     log.info("scan.complete", **{k: v for k, v in summary.items() if k != "errors"})
     return summary

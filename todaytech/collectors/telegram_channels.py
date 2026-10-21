@@ -47,12 +47,14 @@ class TelegramChannelCollector(Collector):
                     entity = await client.get_entity(channel_name)
                     async for message in client.iter_messages(entity, limit=20):
                         if message.text and len(message.text) > 30:
-                            results.append({
-                                "title": message.text[:100].strip(),
-                                "source_url": f"https://t.me/{channel_name}/{message.id}",
-                                "raw_text": message.text[:500],
-                                "source_name": f"telegram:{channel_name}",
-                            })
+                            results.append(
+                                {
+                                    "title": message.text[:100].strip(),
+                                    "source_url": f"https://t.me/{channel_name}/{message.id}",
+                                    "raw_text": message.text[:500],
+                                    "source_name": f"telegram:{channel_name}",
+                                }
+                            )
                 except Exception as exc:
                     log.warning("telegram.channel_failed", channel=channel_name, error=str(exc))
 
