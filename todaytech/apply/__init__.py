@@ -1,0 +1,1 @@
+"""Application assistant package."""
