@@ -2,9 +2,11 @@ name: Scheduled Opportunity Scan & Digest
 
 # Allows users to self-host TodayTech scans entirely on GitHub Actions for free.
 # Configure your secrets in your repo Settings -> Secrets and variables -> Actions:
-# - GEMINI_API_KEY (or GROQ_API_KEY / OPENAI_API_KEY)
-# - TELEGRAM_BOT_TOKEN
-# - TELEGRAM_ALLOWED_USER_IDS
+# - GEMINI_API_KEY (or GROQ_API_KEY / OPENROUTER_API_KEY)
+# - TAVILY_API_KEY (or BRAVE_SEARCH_API_KEY)
+# - TELEGRAM_BOT_TOKEN (optional)
+# - TELEGRAM_USER_ID (optional)
+# - PROFILE_YAML (optional custom profile text)
 
 on:
   schedule:
@@ -45,16 +47,36 @@ jobs:
           LLM_PROVIDER: ${{ secrets.LLM_PROVIDER || 'gemini' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_ALLOWED_USER_IDS: ${{ secrets.TELEGRAM_ALLOWED_USER_IDS }}
+          TELEGRAM_USER_ID: ${{ secrets.TELEGRAM_USER_ID }}
+          PROFILE_YAML: ${{ secrets.PROFILE_YAML }}
           TODAYTECH_DATA_DIR: ./data
         run: |
           mkdir -p data
-          # Run full opportunity scan
+
+          # Check if required secrets are configured in GitHub Actions
+          if [ -z "$GEMINI_API_KEY" ] && [ -z "$GROQ_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "::notice title=Skipping Cloud Scan::No LLM API keys found in GitHub Secrets. To enable daily automated scans on GitHub Actions, add GEMINI_API_KEY (and TAVILY_API_KEY) under Repo Settings -> Secrets and variables -> Actions."
+            exit 0
+          fi
+
+          # Prepare profile
+          if [ -n "$PROFILE_YAML" ]; then
+            echo "$PROFILE_YAML" > profile.yaml
+          elif [ ! -f profile.yaml ]; then
+            cp profile.example.yaml profile.yaml
+          fi
+
+          # Run opportunity scan
           todaytech scan
-          # If Telegram configured, send today's digest notification
-          todaytech digest --notify
+
+          # Send digest notification if Telegram is configured
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_USER_ID" ]; then
+            todaytech digest --notify
+          fi
 
       - name: Save updated database artifact
         if: always()
@@ -63,3 +85,4 @@ jobs:
           name: todaytech-data
           path: data/
           retention-days: 14
+

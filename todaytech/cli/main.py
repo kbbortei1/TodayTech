@@ -158,11 +158,14 @@ def init() -> None:
 
 @cli.command()
 @click.option("--force", is_flag=True, help="Force a fresh scan even if cached")
-def scan(force: bool) -> None:
-    """Run a scan and print the digest to stdout."""
+@click.option("--notify", is_flag=True, help="Send digest notification to configured Telegram user")
+def scan(force: bool, notify: bool) -> None:
+    """Run a scan and print the digest to stdout (and optionally notify via Telegram)."""
     console.print("🔍 [bold]Running scan...[/bold]\n")
 
-    async def _run():
+    async def _run() -> None:
+        import httpx
+
         from todaytech.core.config import get_settings
         from todaytech.core.database import get_opportunities, get_session, init_db
         from todaytech.core.digest import format_digest
@@ -187,6 +190,35 @@ def scan(force: bool) -> None:
         )
         console.print(digest)
 
+        if notify:
+            if settings.telegram_bot_token and settings.telegram_user_id:
+                try:
+                    url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage"
+                    async with httpx.AsyncClient(timeout=15) as client:
+                        resp = await client.post(
+                            url,
+                            json={
+                                "chat_id": settings.telegram_user_id,
+                                "text": digest,
+                                "parse_mode": "Markdown",
+                                "disable_web_page_preview": True,
+                            },
+                        )
+                        if resp.status_code == 200:
+                            console.print(
+                                "\n📲 [green]Digest sent to Telegram successfully![/green]"
+                            )
+                        else:
+                            console.print(
+                                f"\n[yellow]⚠️ Telegram notification failed ({resp.status_code}): {resp.text}[/yellow]"
+                            )
+                except Exception as exc:
+                    console.print(f"\n[yellow]⚠️ Telegram notification error: {exc}[/yellow]")
+            else:
+                console.print(
+                    "\n[yellow]⚠️ Cannot send notification: TELEGRAM_BOT_TOKEN or TELEGRAM_USER_ID not configured.[/yellow]"
+                )
+
     asyncio.run(_run())
 
 
@@ -209,10 +241,13 @@ def run() -> None:
 
 
 @cli.command()
-def digest() -> None:
-    """Show the latest digest from the database."""
+@click.option("--notify", is_flag=True, help="Send digest notification to configured Telegram user")
+def digest(notify: bool) -> None:
+    """Show the latest digest from the database (and optionally send to Telegram)."""
 
-    async def _run():
+    async def _run() -> None:
+        import httpx
+
         from todaytech.core.config import get_settings
         from todaytech.core.database import get_opportunities, get_session, init_db
         from todaytech.core.digest import format_digest
@@ -231,6 +266,35 @@ def digest() -> None:
 
         digest_text = format_digest(opportunities)
         console.print(digest_text)
+
+        if notify:
+            if settings.telegram_bot_token and settings.telegram_user_id:
+                try:
+                    url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage"
+                    async with httpx.AsyncClient(timeout=15) as client:
+                        resp = await client.post(
+                            url,
+                            json={
+                                "chat_id": settings.telegram_user_id,
+                                "text": digest_text,
+                                "parse_mode": "Markdown",
+                                "disable_web_page_preview": True,
+                            },
+                        )
+                        if resp.status_code == 200:
+                            console.print(
+                                "\n📲 [green]Digest sent to Telegram successfully![/green]"
+                            )
+                        else:
+                            console.print(
+                                f"\n[yellow]⚠️ Telegram notification failed ({resp.status_code}): {resp.text}[/yellow]"
+                            )
+                except Exception as exc:
+                    console.print(f"\n[yellow]⚠️ Telegram notification error: {exc}[/yellow]")
+            else:
+                console.print(
+                    "\n[yellow]⚠️ Cannot send notification: TELEGRAM_BOT_TOKEN or TELEGRAM_USER_ID not configured.[/yellow]"
+                )
 
     asyncio.run(_run())
 
