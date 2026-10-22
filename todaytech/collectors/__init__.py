@@ -108,8 +108,33 @@ def register_collector(name: str):
     return decorator
 
 
+def _load_all_collector_modules() -> None:
+    """Import collector modules to trigger @register_collector decorators."""
+    try:
+        import todaytech.collectors.platforms  # noqa: F401
+    except Exception as exc:
+        log.debug("collector.import_failed", module="platforms", error=str(exc))
+    try:
+        import todaytech.collectors.rss  # noqa: F401
+    except Exception as exc:
+        log.debug("collector.import_failed", module="rss", error=str(exc))
+    try:
+        import todaytech.collectors.search  # noqa: F401
+    except Exception as exc:
+        log.debug("collector.import_failed", module="search", error=str(exc))
+    try:
+        import todaytech.collectors.reddit  # noqa: F401
+    except Exception as exc:
+        log.debug("collector.import_failed", module="reddit", error=str(exc))
+    try:
+        import todaytech.collectors.telegram_channels  # noqa: F401
+    except Exception as exc:
+        log.debug("collector.import_failed", module="telegram_channels", error=str(exc))
+
+
 def get_all_collectors(settings: Any) -> list[Collector]:
     """Instantiate all registered collectors."""
+    _load_all_collector_modules()
     collectors = []
     for name, cls in _registry.items():
         try:

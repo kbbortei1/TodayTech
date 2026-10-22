@@ -168,12 +168,15 @@ class Settings(BaseSettings):
 
 
 def load_profile(path: Path | None = None) -> UserProfile | None:
-    """Load user profile from YAML.  Returns None if file doesn't exist."""
+    """Load user profile from YAML. Falls back to profile.example.yaml if profile.yaml is missing."""
     p = path or Path("profile.yaml")
     if not p.exists():
-        return None
+        if Path("profile.example.yaml").exists():
+            p = Path("profile.example.yaml")
+        else:
+            return None
     with open(p, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+        data = yaml.safe_load(f) or {}
     return UserProfile.model_validate(data)
 
 
