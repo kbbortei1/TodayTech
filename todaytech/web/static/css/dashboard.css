@@ -366,6 +366,9 @@ body {
 }
 
 .time-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   background: transparent;
   border: none;
   font-family: var(--font-sans);
@@ -440,6 +443,7 @@ body {
 .type-scholarship { background-color: #EFF7FE; color: #1E66B8; }
 .type-grant { background-color: #EAF7EE; color: #1B783E; }
 .type-internship { background-color: #F8EDFD; color: #8F22B8; }
+.type-ambassador { background-color: #E8F6F5; color: #127670; }
 
 .badge-score {
   display: inline-flex;
@@ -987,7 +991,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  color: var(--accent-terracotta-text);
   flex-shrink: 0;
 }
 
@@ -1011,6 +1015,9 @@ body {
 }
 
 .digest-time-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: none;
   font-family: var(--font-sans);

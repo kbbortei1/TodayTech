@@ -202,15 +202,16 @@ async def get_opportunities(
     *,
     type_filter: str | None = None,
     min_score: int = 0,
-    limit: int = 50,
+    limit: int | None = 50,
 ) -> list[OpportunityRow]:
-    """Fetch opportunities, ordered by fit score descending."""
+    """Fetch opportunities, ordered by fit score descending. ``limit=None`` returns all rows."""
     stmt = select(OpportunityRow).order_by(OpportunityRow.fit_score.desc())
     if type_filter:
         stmt = stmt.where(OpportunityRow.type == type_filter)
     if min_score > 0:
         stmt = stmt.where(OpportunityRow.fit_score >= min_score)
-    stmt = stmt.limit(limit)
+    if limit is not None:
+        stmt = stmt.limit(limit)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 

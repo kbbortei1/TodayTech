@@ -20,6 +20,7 @@ class OpportunityType(str, enum.Enum):
     GRANT = "grant"
     PROGRAM = "program"
     COMPETITION = "competition"
+    AMBASSADOR = "ambassador"
     OTHER = "other"
 
 
@@ -92,6 +93,7 @@ class UserProfile(BaseModel):
             "grant",
             "program",
             "competition",
+            "ambassador",
         ]
     )
     regions: list[str] = Field(default_factory=lambda: ["Global"])

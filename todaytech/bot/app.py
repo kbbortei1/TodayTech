@@ -153,6 +153,8 @@ async def cmd_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         "programs": "program",
         "competition": "competition",
         "competitions": "competition",
+        "ambassador": "ambassador",
+        "ambassadors": "ambassador",
     }
 
     opp_type = None
@@ -163,7 +165,8 @@ async def cmd_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     if not opp_type:
         await update.message.reply_text(
-            "❓ Which type? hackathons, scholarships, internships, fellowships, grants, programs, or competitions?"
+            "❓ Which type? hackathons, scholarships, internships, fellowships, grants, programs, "
+            "competitions, or ambassadors?"
         )
         return
 

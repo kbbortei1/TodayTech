@@ -64,7 +64,7 @@ async def _seed_demo_if_empty(session) -> None:
         return
 
     today = date.today()
-    demo_items = [
+    demo_items: list[dict[str, Any]] = [
         {
             "external_id": "c8f1e29a1b2c3d4e",
             "title": "Google Summer of Code 2027 Mentee Program",
@@ -175,6 +175,28 @@ async def _seed_demo_if_empty(session) -> None:
             "source_url": "https://www.outreachy.org",
             "source_name": "Outreachy",
         },
+        {
+            "external_id": "d41c7b2e9a0f5c63",
+            "title": "GitHub Campus Experts Student Ambassador Program",
+            "type": "ambassador",
+            "organizer": "GitHub Education",
+            "deadline": None,
+            "mode": "hybrid",
+            "location": "Your campus / Global",
+            "cost": 0.0,
+            "reward": "Community leadership training, event support, and access to the GitHub Education network",
+            "eligibility_text": "Students aged 18+ enrolled at a higher-education institution, with a verified GitHub Student Developer Pack.",
+            "countries_allowed": '["all"]',
+            "level_required": "undergraduate",
+            "field_required": "Computer Science / STEM",
+            "fit_score": 85,
+            "fit_reason": "Campus tech leadership role that builds community and public speaking experience",
+            "eligibility_verdict": "Likely",
+            "eligibility_reason": "Open to university students worldwide; requires an active campus community plan",
+            "application_url": "https://education.github.com/experts",
+            "source_url": "https://education.github.com/experts",
+            "source_name": "GitHub Education",
+        },
     ]
 
     for item in demo_items:
@@ -260,9 +282,12 @@ def create_app() -> FastAPI:
         timeframe: str | None = Query(None),  # day, week, month, all
     ) -> list[dict[str, Any]]:
         today = date.today()
+        # Every term must appear somewhere in the searchable fields ("google code" matches
+        # "Google Summer of Code"). Filters run over all rows; the result cap applies after.
+        terms = query.lower().split() if query else []
         async with get_session() as session:
             opps = await get_opportunities(
-                session, type_filter=type, min_score=min_score, limit=100
+                session, type_filter=type, min_score=min_score, limit=None
             )
 
             user_states_stmt = select(UserStateRow)
@@ -315,12 +340,23 @@ def create_app() -> FastAPI:
                     continue
 
             # Query search
-            if query:
-                q = query.lower()
-                combined = (
-                    f"{opp.title} {opp.organizer} {opp.reward} {opp.eligibility_text}".lower()
-                )
-                if q not in combined:
+            if terms:
+                combined = " ".join(
+                    field or ""
+                    for field in (
+                        opp.title,
+                        opp.type,
+                        opp.organizer,
+                        opp.location,
+                        opp.mode,
+                        opp.field_required,
+                        opp.reward,
+                        opp.eligibility_text,
+                        opp.source_name,
+                        opp.fit_reason,
+                    )
+                ).lower()
+                if not all(term in combined for term in terms):
                     continue
 
             days_left = (opp.deadline - today).days if opp.deadline else None
@@ -346,6 +382,8 @@ def create_app() -> FastAPI:
                     "status": opp_status,
                 }
             )
+            if len(results) >= 100:
+                break
 
         return results
 
@@ -550,6 +588,7 @@ def create_app() -> FastAPI:
                     "scholarship",
                     "grant",
                     "internship",
+                    "ambassador",
                 ],
                 "max_application_fee": 0.0,
             }

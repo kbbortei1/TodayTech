@@ -128,6 +128,7 @@ def _type_emoji(type_str: str) -> str:
         "grant": "💰",
         "program": "📚",
         "competition": "🏆",
+        "ambassador": "📣",
     }.get(type_str, "📌")
 
 

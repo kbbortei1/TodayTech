@@ -97,7 +97,9 @@ def init() -> None:
     console.print("\n[bold]── Preferences ──[/bold]")
     types_input = Prompt.ask(
         "Opportunity types (comma-separated)",
-        default="hackathon, scholarship, internship, fellowship, grant, program, competition",
+        default=(
+            "hackathon, scholarship, internship, fellowship, grant, program, competition, ambassador"
+        ),
     )
     profile["opportunity_types"] = [t.strip() for t in types_input.split(",")]
 

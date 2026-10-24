@@ -5,15 +5,16 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from todaytech.core.config import get_settings
-from todaytech.core.database import init_db
-from todaytech.web.app import create_app
+from todaytech.core.database import get_session, init_db
+from todaytech.web.app import _seed_demo_if_empty, create_app
 
 
 @pytest.fixture(autouse=True)
-async def setup_test_db():
-    settings = get_settings()
-    await init_db(settings.database_url)
+async def setup_test_db(tmp_path):
+    # Isolated DB per test. ASGITransport doesn't fire startup events, so seed here.
+    await init_db(f"sqlite+aiosqlite:///{(tmp_path / 'test.db').as_posix()}")
+    async with get_session() as session:
+        await _seed_demo_if_empty(session)
 
 
 @pytest.mark.asyncio
@@ -97,6 +98,40 @@ async def test_save_and_unsave_workflow():
         assert res_saved.status_code == 200
         saved_ids = [item["id"] for item in res_saved.json()]
         assert opp_id not in saved_ids
+
+
+@pytest.mark.asyncio
+async def test_search_query():
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+
+        async def search(q: str) -> list[str]:
+            res = await client.get("/api/opportunities", params={"status": "all", "query": q})
+            assert res.status_code == 200
+            return [item["title"] for item in res.json()]
+
+        # Case-insensitive, and multi-word terms need not be adjacent
+        assert any("Google Summer of Code" in t for t in await search("GOOGLE"))
+        assert any("Google Summer of Code" in t for t in await search("google code"))
+        # Matches on type, not just title text
+        assert any("Hackathon" in t for t in await search("hackathon"))
+        # Every term must match
+        assert await search("google zzz-no-such-term") == []
+        # Campus ambassador programs are searchable by type and title text
+        assert any("Campus Experts" in t for t in await search("campus ambassador"))
+
+
+@pytest.mark.asyncio
+async def test_ambassador_type_filter():
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/api/opportunities", params={"status": "all", "type": "ambassador"})
+        assert res.status_code == 200
+        items = res.json()
+        assert len(items) > 0
+        assert all(item["type"] == "ambassador" for item in items)
 
 
 @pytest.mark.asyncio

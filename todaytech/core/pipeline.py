@@ -42,6 +42,10 @@ def generate_queries(profile: UserProfile) -> list[str]:
     types = profile.opportunity_types
 
     for opp_type in types:
+        if opp_type == "ambassador":
+            queries.extend(_ambassador_queries(profile))
+            continue
+
         # Base query
         queries.append(f"{opp_type} {profile.field_of_study} 2025 2026")
 
@@ -68,6 +72,20 @@ def generate_queries(profile: UserProfile) -> list[str]:
         )
         queries.append(f"site:linkedin.com internship {profile.field_of_study} {profile.country}")
 
+    return queries
+
+
+def _ambassador_queries(profile: UserProfile) -> list[str]:
+    """Queries for campus/student ambassador programs run by tech companies and communities."""
+    queries = [
+        "tech campus ambassador program 2026 apply students",
+        "student ambassador program tech company university 2026",
+        "developer student community lead application 2026",
+        f"campus ambassador {profile.field_of_study} students apply",
+    ]
+    if profile.country:
+        queries.append(f"campus ambassador program {profile.country} university tech")
+        queries.append(f"site:linkedin.com campus ambassador tech {profile.country}")
     return queries
 
 
@@ -133,7 +151,7 @@ SOURCE URL: {source_url}
 Return JSON with these fields (use null for unknown):
 {{
   "title": "string",
-  "type": "hackathon|internship|scholarship|fellowship|grant|program|competition|other",
+  "type": "hackathon|internship|scholarship|fellowship|grant|program|competition|ambassador|other",
   "organizer": "string",
   "deadline": "YYYY-MM-DD or null",
   "start_date": "YYYY-MM-DD or null",
@@ -150,6 +168,8 @@ Return JSON with these fields (use null for unknown):
 }}
 
 RULES:
+- Use type "ambassador" for campus/student ambassador, student champion, community lead, or
+  student developer advocate programs where students represent an organization on campus.
 - Never invent deadlines. If unsure, use null.
 - Extract actual data from the text; do not hallucinate.
 - confidence: 0.9+ if clearly an opportunity, 0.5-0.9 if uncertain, <0.5 if probably not an opportunity.
@@ -352,6 +372,9 @@ def _dict_to_opportunity(data: dict[str, Any]) -> Opportunity:
         if t.value == type_str:
             opp_type = t
             break
+    # LLM fallback or extraction failure: ambassador programs are unambiguous from the title
+    if opp_type == OpportunityType.OTHER and "ambassador" in str(data.get("title", "")).lower():
+        opp_type = OpportunityType.AMBASSADOR
 
     return Opportunity(
         title=data.get("title", "Unknown"),

@@ -64,6 +64,7 @@ class RedditCollector(Collector):
                                 "grant",
                                 "program",
                                 "competition",
+                                "ambassador",
                                 "opportunity",
                                 "apply",
                                 "deadline",

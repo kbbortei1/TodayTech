@@ -47,6 +47,7 @@ opportunity_types:                    # which types to scan for
   - grant
   - program
   - competition
+  - ambassador                        # campus / student ambassador programs
 
 regions:                              # regions you can travel to / apply in
   - "Global"                          # or: Africa, Europe, North America, Asia, etc.

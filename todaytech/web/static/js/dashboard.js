@@ -22,6 +22,8 @@ let currentStatus = 'radar';
 let currentClosingOnly = false;
 let currentTimeframe = 'all';
 let currentSearch = '';
+let searchDebounceTimer = null;
+let opportunitiesRequestId = 0;
 let activeOpportunity = null;
 
 let currentDigestTimeframe = 'day';
@@ -40,7 +42,8 @@ function setupEventListeners() {
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
       currentSearch = e.target.value.trim();
-      loadOpportunities();
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(loadOpportunities, 250);
     });
   }
 
@@ -154,6 +157,9 @@ async function loadOpportunities() {
   const container = document.getElementById('cardsGrid');
   if (!container) return;
 
+  // Ignore responses from requests superseded by a newer filter/search change
+  const requestId = ++opportunitiesRequestId;
+
   try {
     let url = `/api/opportunities?status=${currentStatus}`;
     if (currentClosingOnly) {
@@ -172,6 +178,7 @@ async function loadOpportunities() {
     const res = await fetch(url);
     if (!res.ok) throw new Error('API error');
     const items = await res.json();
+    if (requestId !== opportunitiesRequestId) return;
 
     if (items.length === 0) {
       container.innerHTML = `
@@ -185,6 +192,7 @@ async function loadOpportunities() {
 
     container.innerHTML = items.map((opp) => renderCard(opp)).join('');
   } catch (err) {
+    if (requestId !== opportunitiesRequestId) return;
     console.error('Failed to load opportunities', err);
     container.innerHTML = `<p style="color: var(--text-muted); padding: 24px;">Failed to load opportunities.</p>`;
   }
@@ -363,7 +371,7 @@ async function openAssistant(id) {
 
     const isSaved = (data.status === 'saved' || data.status === 'in_progress' || data.status === 'applied');
     const statusText = data.status === 'in_progress' ? 'Application in Progress' : (data.status === 'applied' ? 'Applied' : (data.status === 'saved' ? 'Saved in Pipeline' : 'On Radar'));
-    const toggleBtnText = isSaved ? '✕ Remove from Pipeline (Unsave)' : `${ICONS.bookmarkOutline} Save to Pipeline`;
+    const toggleBtnText = isSaved ? `${ICONS.cross} Remove from Pipeline (Unsave)` : `${ICONS.bookmarkOutline} Save to Pipeline`;
 
     content.innerHTML = `
       <!-- Drawer Status Action Bar -->
