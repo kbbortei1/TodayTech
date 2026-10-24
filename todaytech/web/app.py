@@ -257,6 +257,7 @@ def create_app() -> FastAPI:
         query: str | None = Query(None),
         min_score: int = Query(0),
         closing_soon: bool = Query(False),
+        timeframe: str | None = Query(None),  # day, week, month, all
     ) -> list[dict[str, Any]]:
         today = date.today()
         async with get_session() as session:
@@ -283,6 +284,8 @@ def create_app() -> FastAPI:
                 and opp_status not in ("drafting", "in_progress")
                 or status == "applied"
                 and opp_status != "applied"
+                or status == "pipeline"
+                and opp_status not in ("saved", "in_progress", "drafting", "applied")
                 or status == "radar"
                 and opp_status == "ignored"
             ):
@@ -295,6 +298,20 @@ def create_app() -> FastAPI:
                     or (opp.deadline - today) > timedelta(days=7)
                     or opp.deadline < today
                 ):
+                    continue
+
+            # Timeframe filter (day, week, month)
+            if timeframe == "day":
+                # Closing in next 3 days or top match
+                if opp.deadline and (opp.deadline - today).days > 3 and opp.deadline >= today:
+                    continue
+            elif timeframe == "week":
+                # Closing in next 7 days
+                if not opp.deadline or (opp.deadline - today).days > 7 or opp.deadline < today:
+                    continue
+            elif timeframe == "month":
+                # Closing in next 30 days
+                if not opp.deadline or (opp.deadline - today).days > 30 or opp.deadline < today:
                     continue
 
             # Query search
@@ -420,6 +437,94 @@ def create_app() -> FastAPI:
     async def trigger_scan(background_tasks: BackgroundTasks) -> dict[str, str]:
         background_tasks.add_task(_safe_scan)
         return {"message": "Scan started in background"}
+
+    @app.get("/api/digest")
+    async def get_daily_digest(timeframe: str = Query("day")) -> dict[str, Any]:
+        """Generate and return today's editorial digest bulletin with closing soon & hot picks."""
+        from todaytech.core.digest import format_digest
+
+        today = date.today()
+        async with get_session() as session:
+            opportunities = await get_opportunities(session, limit=100)
+
+        # Active unscammed opportunities
+        valid_opps = [o for o in opportunities if not o.is_scam]
+
+        # Calculate time window based on timeframe query
+        max_days = 3 if timeframe == "day" else (7 if timeframe == "week" else 30)
+
+        closing_soon = [
+            o for o in valid_opps if o.deadline and 0 <= (o.deadline - today).days <= max_days
+        ]
+        closing_soon.sort(key=lambda o: o.deadline or date.max)
+
+        # Top hot picks (ranked by fit score)
+        hot_picks = sorted(valid_opps, key=lambda o: o.fit_score, reverse=True)[:10]
+
+        digest_markdown = format_digest(valid_opps[:20])
+
+        def _format_item(o: OpportunityRow) -> dict[str, Any]:
+            return {
+                "id": o.external_id,
+                "title": o.title,
+                "type": o.type,
+                "organizer": o.organizer or "Independent",
+                "deadline": o.deadline.isoformat() if o.deadline else None,
+                "days_left": (o.deadline - today).days if o.deadline else None,
+                "fit_score": o.fit_score,
+                "fit_reason": o.fit_reason or "Strong profile match",
+                "reward": o.reward or "Recognition & Experience",
+                "application_url": o.application_url or o.source_url,
+                "location": o.location or "Global",
+                "mode": o.mode or "Online",
+            }
+
+        return {
+            "date": today.strftime("%B %d, %Y"),
+            "timeframe": timeframe,
+            "closing_soon": [_format_item(o) for o in closing_soon[:6]],
+            "hot_picks": [_format_item(o) for o in hot_picks],
+            "digest_markdown": digest_markdown,
+        }
+
+    @app.post("/api/digest/send-telegram")
+    async def send_digest_telegram() -> dict[str, Any]:
+        """Send the formatted daily digest to Telegram on demand."""
+        import httpx
+
+        from todaytech.core.digest import format_digest
+
+        settings = get_settings()
+        if not settings.telegram_bot_token or not settings.telegram_user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Telegram bot token or user ID not configured in .env",
+            )
+
+        async with get_session() as session:
+            opportunities = await get_opportunities(session, limit=50)
+
+        if not opportunities:
+            return {"success": False, "message": "No opportunities in database to send."}
+
+        digest_text = format_digest(opportunities)
+        url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage"
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                url,
+                json={
+                    "chat_id": settings.telegram_user_id,
+                    "text": digest_text,
+                    "parse_mode": "Markdown",
+                    "disable_web_page_preview": True,
+                },
+            )
+            if resp.status_code == 200:
+                return {"success": True, "message": "Digest sent to Telegram!"}
+            raise HTTPException(
+                status_code=502,
+                detail=f"Telegram API error ({resp.status_code}): {resp.text}",
+            )
 
     @app.get("/api/profile")
     async def get_user_profile() -> dict[str, Any]:

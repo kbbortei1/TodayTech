@@ -1,6 +1,6 @@
 /**
  * TodayTech Dashboard Logic
- * Clean Vanilla JS with SVG icons, interactive filtering, and modal controls.
+ * Clean Vanilla JS with SVG icons, interactive filtering, TechHot Digest, and modal controls.
  */
 
 // SVG Icon Helpers
@@ -13,18 +13,24 @@ const ICONS = {
   check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
   alert: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`,
   externalLink: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>`,
-  copy: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`
+  copy: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
+  cross: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`
 };
 
 let currentFilter = 'all';
 let currentStatus = 'radar';
 let currentClosingOnly = false;
+let currentTimeframe = 'all';
 let currentSearch = '';
 let activeOpportunity = null;
+
+let currentDigestTimeframe = 'day';
+let latestDigestData = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   loadStats();
   loadOpportunities();
+  loadPipeline();
   setupEventListeners();
 });
 
@@ -38,12 +44,22 @@ function setupEventListeners() {
     });
   }
 
-  // Filter pills
+  // Type Filter pills
   document.querySelectorAll('.pill-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.pill-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       currentFilter = btn.dataset.type || 'all';
+      loadOpportunities();
+    });
+  });
+
+  // Timeframe Horizon Filter pills
+  document.querySelectorAll('.time-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.time-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTimeframe = btn.dataset.timeframe || 'all';
       loadOpportunities();
     });
   });
@@ -88,6 +104,35 @@ function setupEventListeners() {
       if (e.target === settingsModalBackdrop) closeSettingsModal();
     });
   }
+
+  // TechHot Digest Modal events
+  const digestBtn = document.getElementById('digestBtn');
+  const digestModalClose = document.getElementById('digestModalClose');
+  const digestCloseBtn = document.getElementById('digestCloseBtn');
+  const digestModalBackdrop = document.getElementById('digestModalBackdrop');
+  const copyDigestBtn = document.getElementById('copyDigestBtn');
+  const telegramDigestBtn = document.getElementById('telegramDigestBtn');
+
+  if (digestBtn) digestBtn.addEventListener('click', openDigestModal);
+  if (digestModalClose) digestModalClose.addEventListener('click', closeDigestModal);
+  if (digestCloseBtn) digestCloseBtn.addEventListener('click', closeDigestModal);
+  if (copyDigestBtn) copyDigestBtn.addEventListener('click', copyDigestMarkdown);
+  if (telegramDigestBtn) telegramDigestBtn.addEventListener('click', sendDigestToTelegram);
+  if (digestModalBackdrop) {
+    digestModalBackdrop.addEventListener('click', (e) => {
+      if (e.target === digestModalBackdrop) closeDigestModal();
+    });
+  }
+
+  // Digest Modal timeframe tabs
+  document.querySelectorAll('.digest-time-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.digest-time-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentDigestTimeframe = btn.dataset.timeframe || 'day';
+      loadDigest(currentDigestTimeframe);
+    });
+  });
 }
 
 async function loadStats() {
@@ -117,6 +162,9 @@ async function loadOpportunities() {
     if (currentFilter !== 'all') {
       url += `&type=${encodeURIComponent(currentFilter)}`;
     }
+    if (currentTimeframe !== 'all') {
+      url += `&timeframe=${encodeURIComponent(currentTimeframe)}`;
+    }
     if (currentSearch) {
       url += `&query=${encodeURIComponent(currentSearch)}`;
     }
@@ -129,17 +177,27 @@ async function loadOpportunities() {
       container.innerHTML = `
         <div style="grid-column: 1 / -1; padding: 48px 24px; text-align: center; background: #fff; border-radius: 12px; border: 1px solid var(--border-subtle);">
           <h3 style="font-family: var(--font-serif); font-size: 22px; margin-bottom: 8px;">No opportunities found</h3>
-          <p style="color: var(--text-muted); font-size: 14px;">Try loosening your filters or search terms.</p>
+          <p style="color: var(--text-muted); font-size: 14px;">Try loosening your filters or horizon timeframe.</p>
         </div>
       `;
       return;
     }
 
     container.innerHTML = items.map((opp) => renderCard(opp)).join('');
-    updatePipeline(items);
   } catch (err) {
     console.error('Failed to load opportunities', err);
     container.innerHTML = `<p style="color: var(--text-muted); padding: 24px;">Failed to load opportunities.</p>`;
+  }
+}
+
+async function loadPipeline() {
+  try {
+    const res = await fetch('/api/opportunities?status=pipeline');
+    if (!res.ok) return;
+    const items = await res.json();
+    updatePipeline(items);
+  } catch (err) {
+    console.error('Failed to load pipeline', err);
   }
 }
 
@@ -157,9 +215,11 @@ function renderCard(opp) {
     }
   }
 
-  const isSaved = opp.status === 'saved';
+  const isSaved = opp.status === 'saved' || opp.status === 'in_progress' || opp.status === 'applied';
   const saveIcon = isSaved ? ICONS.bookmarkFilled : ICONS.bookmarkOutline;
   const saveLabel = isSaved ? 'Saved' : 'Save';
+  const saveClass = isSaved ? 'btn-link btn-saved' : 'btn-link';
+  const saveTitle = isSaved ? 'Click to unsave (remove from pipeline)' : 'Save to pipeline';
 
   return `
     <article class="card">
@@ -197,7 +257,7 @@ function renderCard(opp) {
         <button class="btn btn-primary btn-sm" onclick="openAssistant('${opp.id}')">
           Prepare Application
         </button>
-        <button class="btn-link" onclick="toggleSave('${opp.id}', '${opp.status}')" style="display: inline-flex; align-items: center; gap: 5px;">
+        <button class="${saveClass}" onclick="toggleSave('${opp.id}', '${opp.status}')" title="${saveTitle}" style="display: inline-flex; align-items: center; gap: 5px;">
           ${saveIcon}
           <span>${saveLabel}</span>
         </button>
@@ -222,20 +282,46 @@ function updatePipeline(items) {
   }
 
   pipelineContainer.innerHTML = activeItems.map(item => `
-    <div class="pipeline-item" onclick="openAssistant('${item.id}')" title="Click to prepare materials">
+    <div class="pipeline-item" onclick="openAssistant('${item.id}')" title="Click to open application studio">
       <div class="pipeline-item-top">
-        <span class="pipeline-item-title">${escapeHtml(item.title.substring(0, 30))}...</span>
-        <span class="status-badge status-${item.status}">${item.status.replace('_', ' ')}</span>
+        <span class="pipeline-item-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</span>
+        <div class="pipeline-item-actions">
+          <span class="status-badge status-${item.status}">${item.status.replace('_', ' ')}</span>
+          <button class="pipeline-remove-btn" onclick="event.stopPropagation(); unsaveOpportunity('${item.id}')" title="Unsave / Remove from pipeline" aria-label="Unsave opportunity">
+            ${ICONS.cross}
+          </button>
+        </div>
       </div>
       <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 5px; margin-top: 4px;">
-        ${ICONS.calendar} ${item.deadline ? 'Due: ' + item.deadline : 'Open'}
+        ${ICONS.calendar} ${item.deadline ? 'Due: ' + item.deadline : 'Open enrollment'}
       </div>
     </div>
   `).join('');
 }
 
+async function unsaveOpportunity(id) {
+  try {
+    await fetch(`/api/opportunity/${id}/state`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'radar' })
+    });
+    showToast('Removed from active pipeline');
+    loadStats();
+    loadOpportunities();
+    loadPipeline();
+    if (activeOpportunity && activeOpportunity.id === id) {
+      openAssistant(id);
+    }
+  } catch (err) {
+    console.error('Failed to unsave opportunity', err);
+    showToast('Failed to update pipeline');
+  }
+}
+
 async function toggleSave(id, currentStatus) {
-  const nextStatus = currentStatus === 'saved' ? 'radar' : 'saved';
+  const isCurrentlySaved = currentStatus === 'saved' || currentStatus === 'in_progress' || currentStatus === 'applied';
+  const nextStatus = isCurrentlySaved ? 'radar' : 'saved';
   try {
     await fetch(`/api/opportunity/${id}/state`, {
       method: 'POST',
@@ -245,9 +331,18 @@ async function toggleSave(id, currentStatus) {
     showToast(nextStatus === 'saved' ? 'Saved to your active pipeline' : 'Removed from active pipeline');
     loadStats();
     loadOpportunities();
+    loadPipeline();
+    if (activeOpportunity && activeOpportunity.id === id) {
+      openAssistant(id);
+    }
   } catch (err) {
     console.error('Failed to toggle save state', err);
+    showToast('Failed to update opportunity state');
   }
+}
+
+async function toggleSaveFromDrawer(id, currentStatus) {
+  await toggleSave(id, currentStatus);
 }
 
 async function openAssistant(id) {
@@ -266,7 +361,22 @@ async function openAssistant(id) {
 
     document.getElementById('drawerTitle').textContent = data.title;
 
+    const isSaved = (data.status === 'saved' || data.status === 'in_progress' || data.status === 'applied');
+    const statusText = data.status === 'in_progress' ? 'Application in Progress' : (data.status === 'applied' ? 'Applied' : (data.status === 'saved' ? 'Saved in Pipeline' : 'On Radar'));
+    const toggleBtnText = isSaved ? '✕ Remove from Pipeline (Unsave)' : `${ICONS.bookmarkOutline} Save to Pipeline`;
+
     content.innerHTML = `
+      <!-- Drawer Status Action Bar -->
+      <div class="drawer-status-bar">
+        <div class="drawer-status-info">
+          <span style="font-weight: 500; color: var(--text-muted);">Status:</span>
+          <span class="status-badge status-${data.status}">${statusText}</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="toggleSaveFromDrawer('${data.id}', '${data.status}')">
+          ${toggleBtnText}
+        </button>
+      </div>
+
       <div class="studio-section">
         <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
           <span class="type-tag type-${data.type.toLowerCase()}">${data.type}</span>
@@ -352,6 +462,7 @@ async function generateDrafts(id) {
     showToast('Application drafts created in data/drafts/');
     loadStats();
     loadOpportunities();
+    loadPipeline();
   } catch (err) {
     draftContainer.innerHTML = `<p style="color: var(--accent-terracotta-text);">Draft generation failed. Make sure your LLM provider key is set in .env.</p>`;
   } finally {
@@ -371,6 +482,141 @@ function copyDraftText() {
 function closeDrawer() {
   document.getElementById('drawer').classList.remove('active');
   document.getElementById('drawerBackdrop').classList.remove('active');
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// TechHot Daily Digest Modal
+// ──────────────────────────────────────────────────────────────────────────
+
+function openDigestModal() {
+  const modalBackdrop = document.getElementById('digestModalBackdrop');
+  if (!modalBackdrop) return;
+  modalBackdrop.classList.add('active');
+  loadDigest(currentDigestTimeframe);
+}
+
+function closeDigestModal() {
+  const modalBackdrop = document.getElementById('digestModalBackdrop');
+  if (modalBackdrop) modalBackdrop.classList.remove('active');
+}
+
+async function loadDigest(timeframe = 'day') {
+  const closingList = document.getElementById('digestClosingList');
+  const hotList = document.getElementById('digestHotList');
+  const closingCount = document.getElementById('digestClosingCount');
+  const hotCount = document.getElementById('digestHotCount');
+  const dateLabel = document.getElementById('digestDateLabel');
+
+  if (closingList) closingList.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">Loading closing targets...</div>`;
+  if (hotList) hotList.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">Loading top recommendations...</div>`;
+
+  try {
+    const res = await fetch(`/api/digest?timeframe=${encodeURIComponent(timeframe)}`);
+    if (!res.ok) throw new Error('Failed to load digest');
+    const data = await res.json();
+    latestDigestData = data;
+
+    if (dateLabel && data.date) {
+      dateLabel.textContent = `Curated briefing for ${data.date} • ${timeframe === 'day' ? 'Today' : (timeframe === 'week' ? 'This Week' : 'This Month')}`;
+    }
+
+    // Populate Closing Soon
+    const closingItems = data.closing_soon || [];
+    if (closingCount) closingCount.textContent = closingItems.length;
+    if (closingList) {
+      if (closingItems.length === 0) {
+        closingList.innerHTML = `
+          <div style="padding: 24px; text-align: center; background: var(--bg-surface-subtle); border-radius: 8px; color: var(--text-muted); font-size: 13px;">
+            No applications closing within this horizon.
+          </div>
+        `;
+      } else {
+        closingList.innerHTML = closingItems.map(item => renderDigestCard(item, true)).join('');
+      }
+    }
+
+    // Populate Hot Picks
+    const hotItems = data.hot_picks || [];
+    if (hotCount) hotCount.textContent = hotItems.length;
+    if (hotList) {
+      if (hotItems.length === 0) {
+        hotList.innerHTML = `
+          <div style="padding: 24px; text-align: center; background: var(--bg-surface-subtle); border-radius: 8px; color: var(--text-muted); font-size: 13px;">
+            No opportunities found for this horizon.
+          </div>
+        `;
+      } else {
+        hotList.innerHTML = hotItems.map(item => renderDigestCard(item, false)).join('');
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load digest', err);
+    if (closingList) closingList.innerHTML = `<p style="color: var(--accent-terracotta-text); padding: 16px;">Failed to load digest.</p>`;
+    if (hotList) hotList.innerHTML = `<p style="color: var(--accent-terracotta-text); padding: 16px;">Failed to load digest.</p>`;
+  }
+}
+
+function renderDigestCard(item, isUrgent = false) {
+  const typeClass = `type-${(item.type || '').toLowerCase()}`;
+  let deadlineTag = `<span class="tag-comfortable">${ICONS.calendar} ${item.deadline || 'Open'}</span>`;
+  if (item.days_left !== null && item.days_left !== undefined) {
+    deadlineTag = `<span class="tag-urgent">${ICONS.calendar} ${item.days_left}d left</span>`;
+  }
+
+  return `
+    <div class="digest-item-card" onclick="openOpportunityFromDigest('${item.id}')" title="Click to view full details and application materials">
+      <div class="digest-item-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="type-tag ${typeClass}" style="font-size: 10px; padding: 2px 8px;">${item.type}</span>
+          <span class="badge-score" style="font-size: 10.5px; padding: 2px 7px;">${item.fit_score}% Match</span>
+        </div>
+        ${deadlineTag}
+      </div>
+      <div class="digest-item-title">${escapeHtml(item.title)}</div>
+      <div class="digest-item-org">${escapeHtml(item.organizer)} • ${escapeHtml(item.mode)}</div>
+      <div class="digest-item-meta">
+        <span style="color: var(--text-main); font-weight: 500;">${escapeHtml(item.reward)}</span>
+        <span style="color: var(--accent-sage-text); font-weight: 500;">View in Studio &rarr;</span>
+      </div>
+    </div>
+  `;
+}
+
+function openOpportunityFromDigest(id) {
+  closeDigestModal();
+  openAssistant(id);
+}
+
+function copyDigestMarkdown() {
+  if (!latestDigestData || !latestDigestData.digest_markdown) {
+    showToast('No digest content available to copy.');
+    return;
+  }
+  navigator.clipboard.writeText(latestDigestData.digest_markdown).then(() => {
+    showToast('Copied TechHot digest markdown to clipboard!');
+  });
+}
+
+async function sendDigestToTelegram() {
+  const btn = document.getElementById('telegramDigestBtn');
+  const btnText = document.getElementById('telegramBtnText');
+  if (btn) btn.disabled = true;
+  if (btnText) btnText.textContent = 'Sending...';
+
+  try {
+    const res = await fetch('/api/digest/send-telegram', { method: 'POST' });
+    const result = await res.json();
+    if (res.ok) {
+      showToast('Daily digest dispatched to your Telegram chat!');
+    } else {
+      showToast(result.detail || 'Failed to dispatch Telegram message. Check .env');
+    }
+  } catch (err) {
+    showToast('Network error while dispatching to Telegram.');
+  } finally {
+    if (btn) btn.disabled = false;
+    if (btnText) btnText.textContent = 'Send to Telegram';
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -456,6 +702,7 @@ async function triggerScan() {
       scanText.textContent = 'Scan Sources';
       loadStats();
       loadOpportunities();
+      loadPipeline();
     }, 2500);
   }
 }

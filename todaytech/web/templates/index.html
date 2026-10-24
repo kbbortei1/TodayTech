@@ -30,6 +30,13 @@
       </div>
 
       <div class="masthead-actions">
+        <button id="digestBtn" class="btn btn-secondary btn-sm" title="View Today's Curated Opportunity Digest">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+          <span>TechHot Digest</span>
+        </button>
+
         <button id="settingsBtn" class="btn btn-secondary btn-sm" title="Edit Profile & Preferences">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="4" y1="21" x2="4" y2="14"></line>
@@ -85,15 +92,25 @@
         </button>
       </div>
 
-      <!-- Filter Bar -->
+      <!-- Filter Bar with Type & Timeframe Controls -->
       <div class="filter-bar">
         <div class="filter-pills" role="tablist">
-          <button class="pill-btn active" data-type="all">All Opportunities</button>
+          <button class="pill-btn active" data-type="all">All Types</button>
           <button class="pill-btn" data-type="fellowship">Fellowships</button>
           <button class="pill-btn" data-type="hackathon">Hackathons</button>
           <button class="pill-btn" data-type="scholarship">Scholarships</button>
           <button class="pill-btn" data-type="grant">Grants</button>
           <button class="pill-btn" data-type="internship">Internships</button>
+        </div>
+
+        <div class="timeframe-group" role="tablist" aria-label="Filter by timeframe">
+          <span class="timeframe-label">Horizon:</span>
+          <div class="timeframe-pills">
+            <button class="time-btn active" data-timeframe="all">All Time</button>
+            <button class="time-btn" data-timeframe="day" title="Top picks &amp; closing in next 3 days">⚡ Today</button>
+            <button class="time-btn" data-timeframe="week" title="Closing in next 7 days">🗓️ This Week</button>
+            <button class="time-btn" data-timeframe="month" title="Closing in next 30 days">📆 This Month</button>
+          </div>
         </div>
       </div>
 
@@ -212,6 +229,91 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" id="settingsCancelBtn">Cancel</button>
         <button type="button" class="btn btn-primary btn-sm" id="settingsSaveBtn">Save Preferences</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TechHot Daily Digest Modal -->
+  <div class="modal-backdrop" id="digestModalBackdrop">
+    <div class="modal modal-lg" id="digestModal">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="flame-icon-box">🔥</div>
+          <div>
+            <h2 class="modal-title">TechHot Opportunities Digest</h2>
+            <div class="modal-subhead" id="digestDateLabel">Curated daily briefing for high-impact opportunities</div>
+          </div>
+        </div>
+        <button class="drawer-close" id="digestModalClose" aria-label="Close Digest">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Digest Sub-header Toolbar -->
+      <div class="digest-toolbar">
+        <div class="digest-timeframe-pills" role="tablist" aria-label="Digest Horizon">
+          <button class="digest-time-btn active" data-timeframe="day">⚡ Today</button>
+          <button class="digest-time-btn" data-timeframe="week">🗓️ This Week</button>
+          <button class="digest-time-btn" data-timeframe="month">📆 This Month</button>
+        </div>
+        <div class="digest-toolbar-actions">
+          <button class="btn btn-secondary btn-sm" id="copyDigestBtn" title="Copy formatted markdown to clipboard">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy Markdown</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" id="telegramDigestBtn" title="Dispatch this digest directly to Telegram">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+            <span id="telegramBtnText">Send to Telegram</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-body digest-body" id="digestBody">
+        <div class="digest-sections-grid">
+          <!-- Closing Soon Column -->
+          <section class="digest-column">
+            <div class="digest-col-header">
+              <div class="digest-col-title-wrap">
+                <span class="digest-dot dot-urgent"></span>
+                <h3 class="digest-col-title">Closing Soon</h3>
+              </div>
+              <span class="digest-count-badge" id="digestClosingCount">0</span>
+            </div>
+            <div class="digest-cards-list" id="digestClosingList">
+              <!-- Dynamically populated -->
+            </div>
+          </section>
+
+          <!-- Hot Recommendations Column -->
+          <section class="digest-column">
+            <div class="digest-col-header">
+              <div class="digest-col-title-wrap">
+                <span class="digest-dot dot-hot"></span>
+                <h3 class="digest-col-title">TechHot Top Picks</h3>
+              </div>
+              <span class="digest-count-badge" id="digestHotCount">0</span>
+            </div>
+            <div class="digest-cards-list" id="digestHotList">
+              <!-- Dynamically populated -->
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <span style="font-size: 12.5px; color: var(--text-muted); margin-right: auto;">
+          Click any card to inspect or prepare draft materials.
+        </span>
+        <button type="button" class="btn btn-secondary btn-sm" id="digestCloseBtn">Close</button>
       </div>
     </div>
   </div>
